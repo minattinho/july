@@ -52,7 +52,7 @@
 }
 
 .card .value.income {
-  color: #00c49f;
+  color: #326e37;
 }
 
 .card .value.expense {
@@ -105,7 +105,7 @@
 
 .month-select:hover,
 .month-select:focus {
-  border-color: var(--primary-color);
+  border-color: #326e37;
 }
 
 @media (max-width: 768px) {

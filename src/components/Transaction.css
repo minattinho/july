@@ -39,7 +39,8 @@ tr.offline-transaction td:first-child::before {
 }
 
 /* Estilos para categorias e métodos de pagamento */
-.category-tag, .payment-method-tag {
+.category-tag,
+.payment-method-tag {
   display: inline-block;
   padding: 0.2rem 0.5rem;
   border-radius: 3px;
@@ -67,7 +68,7 @@ tr.offline-transaction td:first-child::before {
 }
 
 .payment-method-tag.money {
-  border-left-color: #4caf50;
+  border-left-color: #326e37;
 }
 
 .payment-method-tag.pix {

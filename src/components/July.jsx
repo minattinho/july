@@ -67,6 +67,10 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
   const [paymentMethod, setPaymentMethod] = useState("money");
   const [isRecurring, setIsRecurring] = useState(false);
   const [installments, setInstallments] = useState(1);
+  const [transactionDate, setTransactionDate] = useState(() => {
+    const today = new Date();
+    return today.toISOString().split("T")[0]; // Formato YYYY-MM-DD
+  });
   const [activeScreen, setActiveScreen] = useState("register");
   const [syncStatus, setSyncStatus] = useState("synced");
   const [networkStatus, setNetworkStatus] = useState(navigator.onLine);
@@ -279,8 +283,8 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
     }
 
     const baseAmount = parsedAmount;
-    const now = new Date();
-    const transactionDate = now.toISOString();
+    const selectedDate = new Date(transactionDate);
+    const transactionDateTime = selectedDate.toISOString();
 
     // Handle installments
     if (isRecurring && type === "expense" && installments > 1) {
@@ -289,8 +293,8 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
       const newTransactions = [];
 
       for (let i = 0; i < installments; i++) {
-        const installmentDate = new Date();
-        installmentDate.setMonth(now.getMonth() + i);
+        const installmentDate = new Date(selectedDate);
+        installmentDate.setMonth(selectedDate.getMonth() + i);
 
         const newTransaction = {
           userId,
@@ -406,9 +410,9 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
         type,
         category,
         paymentMethod,
-        date: now.toISOString(),
+        date: transactionDateTime,
         isInstallment: false,
-        createdAt: now.toISOString(),
+        createdAt: new Date().toISOString(),
         tags: selectedTags.map((tag) => ({
           id: tag.id,
           name: tag.name,
@@ -516,6 +520,10 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
     setInstallments(1);
     setPaymentMethod("money");
     setSelectedTags([]);
+    setTransactionDate(() => {
+      const today = new Date();
+      return today.toISOString().split("T")[0]; // Resetar para hoje
+    });
   };
 
   // Excluir transação
@@ -824,6 +832,17 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
                     step="0.01"
                     min="0.01"
                     required
+                    className="modern-input"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="transactionDate">Data</label>
+                  <input
+                    type="date"
+                    id="transactionDate"
+                    value={transactionDate}
+                    onChange={(e) => setTransactionDate(e.target.value)}
                     className="modern-input"
                   />
                 </div>

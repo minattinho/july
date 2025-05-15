@@ -1,14 +1,14 @@
 /* Cores e variáveis */
 :root {
-  --primary-color: #2c9e4b;
-  --primary-dark: #1e703c;
-  --primary-light: #e6f4e9;
-  --accent-color: #22b573;
+  --primary-color: #326e37;
+  --primary-dark: #275829;
+  --primary-light: #e8f2e9;
+  --accent-color: #3b8244;
   --text-color: #333333;
   --text-light: #666666;
   --white: #ffffff;
   --red: #e53935;
-  --green: #43a047;
+  --green: #326e37;
   --green-light: #c8e6c9;
   --red-light: #ffcdd2;
   --shadow: 0 2px 5px rgba(0, 0, 0, 0.1);

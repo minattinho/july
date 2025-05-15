@@ -122,7 +122,8 @@
 }
 
 /* Loading and Empty States */
-.loading, .empty-goals {
+.loading,
+.empty-goals {
   text-align: center;
   padding: 3rem 1rem;
   color: var(--text-light);
@@ -294,12 +295,12 @@
   .goals-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .goal-details {
     flex-direction: column;
     gap: 1rem;
   }
-  
+
   .goal-date {
     text-align: left;
   }
