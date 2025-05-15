@@ -14,6 +14,11 @@
   --shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   --border-radius: 6px;
   --container-width: 1200px;
+
+  /* Novas variáveis para o Dashboard */
+  --text-primary: #333333;
+  --border-color: #ddd;
+  --background-light: #f9f9f9;
 }
 
 /* Reset e base */
@@ -24,7 +29,7 @@
 }
 
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   line-height: 1.6;
   color: var(--text-color);
   background-color: var(--primary-light);
@@ -123,7 +128,7 @@ body {
 }
 
 .app-tabs button.active::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: 0;
   left: 0;
@@ -174,8 +179,12 @@ body {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Responsividade */
@@ -185,21 +194,21 @@ body {
     align-items: flex-start;
     gap: 1rem;
   }
-  
+
   .user-info {
     width: 100%;
     justify-content: space-between;
   }
-  
+
   .app-tabs {
     padding: 0;
   }
-  
+
   .app-tabs button {
     padding: 0.8rem 1rem;
     font-size: 0.9rem;
   }
-  
+
   .app-content {
     padding: 1rem 0;
   }
