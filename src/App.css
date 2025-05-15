@@ -16,9 +16,10 @@
   --container-width: 1200px;
 
   /* Novas variáveis para o Dashboard */
-  --text-primary: #333333;
+  --text-primary: var(--text-color);
   --border-color: #ddd;
   --background-light: #f9f9f9;
+  --background-main: var(--primary-light);
 }
 
 /* Reset e base */
@@ -40,6 +41,7 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  background-color: var(--background-main);
 }
 
 .container {

@@ -8,6 +8,7 @@ import Goals from "./components/Goals";
 import Reports from "./components/Reports";
 import Login from "./components/Login";
 import LoadingScreen from "./components/LoadingScreen";
+import ThemeToggle from "./components/ThemeToggle";
 import "./App.css";
 import Notifications from "./components/Notifications";
 
@@ -169,6 +170,7 @@ function App() {
             <span>Olá, {user.email}</span>
             <div className="development-badge">Desenvolvimento</div>
             <Notifications userId={user.uid} />
+            <ThemeToggle />
             <button onClick={handleLogout} className="logout-button">
               Sair
             </button>
