@@ -38,6 +38,48 @@ const Dashboard = ({ transactions }) => {
     averageTransaction: 0,
   });
 
+  // Função para mapear IDs de categoria para nomes em português
+  const getCategoryName = (categoryId) => {
+    const categoryMap = {
+      // Despesas
+      general_expense: "Geral",
+      food: "Alimentação",
+      transport: "Transporte",
+      housing: "Moradia",
+      entertainment: "Lazer",
+      health: "Saúde",
+      education: "Educação",
+      clothing: "Vestuário",
+      utilities: "Contas & Serviços",
+
+      // Receitas
+      general_income: "Geral",
+      salary: "Salário",
+      freelance: "Freelance",
+      investments: "Investimentos",
+      gifts: "Presentes",
+      sales: "Vendas",
+      rental: "Aluguel",
+      refunds: "Reembolsos",
+    };
+
+    return categoryMap[categoryId] || categoryId;
+  };
+
+  // Função para mapear IDs de método de pagamento para nomes em português
+  const getPaymentMethodName = (methodId) => {
+    const methodMap = {
+      money: "Dinheiro",
+      debit_card: "Cartão de Débito",
+      credit_card: "Cartão de Crédito",
+      pix: "Pix",
+      bank_transfer: "Transferência",
+      bill: "Boleto",
+    };
+
+    return methodMap[methodId] || methodId;
+  };
+
   // Função para gerar os últimos 12 meses a partir do mês atual
   const getLast12Months = () => {
     const months = [];
@@ -117,7 +159,7 @@ const Dashboard = ({ transactions }) => {
 
     const categoryChartData = Object.entries(categoryTransactions).map(
       ([category, amount]) => ({
-        name: category,
+        name: getCategoryName(category),
         value: amount,
       })
     );
@@ -137,7 +179,7 @@ const Dashboard = ({ transactions }) => {
     const paymentMethodChartData = Object.entries(
       paymentMethodTransactions
     ).map(([method, amount]) => ({
-      name: method,
+      name: getPaymentMethodName(method),
       value: amount,
     }));
 
