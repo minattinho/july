@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "buildCommand": "npm install recharts && npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite"
+}

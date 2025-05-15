@@ -1,0 +1,201 @@
+/* Estilos para o componente TransactionsList */
+
+.transactions-list-container {
+  background-color: var(--white);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+/* Cabeçalho com título e busca */
+.transactions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.transactions-header h2 {
+  font-size: 1.5rem;
+  color: var(--primary-dark);
+  margin: 0;
+}
+
+.search-bar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.search-bar input {
+  padding: 0.5rem 0.8rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  width: 250px;
+}
+
+.search-bar input:focus {
+  border-color: var(--primary-color);
+  outline: none;
+}
+
+.filter-toggle {
+  background-color: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 0.5rem 0.8rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-toggle:hover {
+  background-color: #e0e0e0;
+}
+
+/* Painel de filtros */
+.filters-panel {
+  background-color: #f9f9f9;
+  border: 1px solid #f0f0f0;
+  border-radius: var(--border-radius);
+  padding: 1.2rem;
+  margin-bottom: 1.5rem;
+}
+
+.filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.filter-group label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-light);
+}
+
+.filter-group select,
+.filter-group input {
+  padding: 0.5rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.filter-group select:focus,
+.filter-group input:focus {
+  border-color: var(--primary-color);
+  outline: none;
+}
+
+.filter-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.clear-filters {
+  background: none;
+  border: none;
+  color: var(--primary-color);
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+/* Sumário de resultados */
+.results-summary {
+  font-size: 0.9rem;
+  color: var(--text-light);
+  margin-bottom: 1rem;
+}
+
+/* Tabela de transações */
+.transactions-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+}
+
+.transactions-table th,
+.transactions-table td {
+  padding: 0.8rem;
+  border-bottom: 1px solid #f0f0f0;
+  text-align: left;
+}
+
+.transactions-table th {
+  font-weight: 600;
+  color: var(--text-color);
+  background-color: #f9f9f9;
+}
+
+.transactions-table tr:hover {
+  background-color: #f8f8f8;
+}
+
+/* Mensagem de nenhuma transação encontrada */
+.no-transactions {
+  text-align: center;
+  padding: 2rem 0;
+  color: var(--text-light);
+}
+
+/* Responsividade para celulares */
+@media (max-width: 768px) {
+  .transactions-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .search-bar {
+    width: 100%;
+  }
+  
+  .search-bar input {
+    flex: 1;
+  }
+  
+  .filters-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .transactions-table {
+    font-size: 0.85rem;
+  }
+  
+  /* Tabela responsiva */
+  .transactions-table thead {
+    display: none;
+  }
+  
+  .transactions-table tr {
+    display: block;
+    margin-bottom: 1rem;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+  }
+  
+  .transactions-table td {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.6rem;
+    text-align: right;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  
+  .transactions-table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    float: left;
+    text-align: left;
+  }
+}

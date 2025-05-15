@@ -1,0 +1,68 @@
+/* Sync status indicators */
+.sync-indicator {
+  position: sticky;
+  top: 0;
+  width: 100%;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.3s;
+}
+
+.sync-indicator.syncing {
+  background-color: #bbdefb;
+  color: #1565c0;
+}
+
+.sync-indicator.error {
+  background-color: #ffcdd2;
+  color: #c62828;
+}
+
+.sync-indicator.offline {
+  background-color: #fff9c4;
+  color: #f57f17;
+}
+
+.sync-icon {
+  font-size: 1.1rem;
+}
+
+.sync-indicator.syncing .sync-icon {
+  animation: rotate 1.5s linear infinite;
+}
+
+@keyframes rotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.sync-button {
+  background-color: transparent;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  padding: 0.2rem 0.5rem;
+  margin-left: 0.5rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.sync-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Indicator for offline transactions */
+tr.offline-transaction {
+  background-color: rgba(255, 249, 196, 0.3);
+}
+
+tr.offline-transaction td:first-child::before {
+  content: "⌛";
+  margin-right: 0.5rem;
+  opacity: 0.7;
+}
