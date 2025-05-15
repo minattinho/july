@@ -157,16 +157,27 @@ export default function FinanceOrganizer({
       // Use batch for better performance and atomicity
       const batch = writeBatch(db);
 
+      // Rastrear IDs locais para remover após sincronização
+      const processedLocalIds = [];
+
       // Process each offline transaction
       for (const transaction of offlineTransactions) {
         if (transaction._operation === "add") {
           // For new transactions
           const { _operation, _localId, ...transactionData } = transaction;
+
+          // Rastrear para remoção
+          if (_localId) {
+            processedLocalIds.push(_localId);
+          }
+
           const newDocRef = doc(collection(db, "transactions"));
+          // Adicionamos uma marca para identificar que é uma transação que foi sincronizada
           batch.set(newDocRef, {
             ...transactionData,
             userId,
             syncedAt: serverTimestamp(),
+            syncSource: "offline", // Marca adicional para depuração
           });
         } else if (transaction._operation === "delete" && transaction.id) {
           // For deleted transactions
@@ -177,7 +188,8 @@ export default function FinanceOrganizer({
       // Commit the batch
       await batch.commit();
 
-      // Clear offline transactions
+      // Remover transações sincronizadas do array local
+      // Isso evita que o código tente sincronizar novamente
       setOfflineTransactions([]);
       localStorage.removeItem("offlineTransactions");
 
@@ -306,13 +318,6 @@ export default function FinanceOrganizer({
             await checkRecurringTransactions(userId);
 
             setSyncStatus("synced");
-
-            // Notificar o componente pai
-            if (onTransactionAdded) {
-              newTransactions.forEach((transaction) => {
-                onTransactionAdded(transaction);
-              });
-            }
           } catch (error) {
             console.error("Erro ao adicionar transações:", error);
             setSyncStatus("error");
@@ -337,6 +342,11 @@ export default function FinanceOrganizer({
               "offlineTransactions",
               JSON.stringify(updatedOfflineTransactions)
             );
+
+            // Apenas no caso de erro, atualizamos a interface para feedback imediato
+            localTransactionsView.forEach((t) => {
+              updateLocalTransactionsView(t);
+            });
           }
         } else {
           // Store offline for later sync
@@ -360,7 +370,7 @@ export default function FinanceOrganizer({
             JSON.stringify(updatedOfflineTransactions)
           );
 
-          // Update local transactions view
+          // Update local transactions view apenas no modo offline
           const localTransactionsView = offlineTransactionsToAdd.map((t) => ({
             ...t,
             id: t._localId,
@@ -408,11 +418,6 @@ export default function FinanceOrganizer({
             await checkSpendingLimit(userId, addedTransaction);
 
             setSyncStatus("synced");
-
-            // Notificar o componente pai
-            if (onTransactionAdded) {
-              onTransactionAdded(addedTransaction);
-            }
           } catch (error) {
             console.error("Erro ao adicionar transação:", error);
             setSyncStatus("error");
@@ -436,7 +441,7 @@ export default function FinanceOrganizer({
               JSON.stringify(updatedOfflineTransactions)
             );
 
-            // Update local transactions view
+            // Update local transactions view apenas em caso de erro
             updateLocalTransactionsView({
               ...offlineTransaction,
               id: offlineTransaction._localId,
@@ -466,7 +471,7 @@ export default function FinanceOrganizer({
             JSON.stringify(updatedOfflineTransactions)
           );
 
-          // Update local transactions view
+          // Update local transactions view apenas no modo offline
           updateLocalTransactionsView({
             ...offlineTransaction,
             id: offlineTransaction._localId,
@@ -730,10 +735,18 @@ export default function FinanceOrganizer({
     setActiveScreen("register");
   };
 
-  // Update local transactions view (mudando push para não modificar o array original)
+  // Update local transactions view (para evitar duplicações)
   const updateLocalTransactionsView = (newTransaction) => {
-    if (onTransactionAdded) {
-      onTransactionAdded(newTransaction);
+    // Verificamos se o listener do Firestore no App.jsx já está ativo
+    // Se estiver online e não for uma transação gerada localmente, não precisamos atualizar manualmente
+    const isLocalTransaction =
+      newTransaction.id && newTransaction.id.toString().startsWith("local_");
+
+    if (!networkStatus || isLocalTransaction) {
+      // Apenas notificamos se estiver offline ou for transação local
+      if (onTransactionAdded) {
+        onTransactionAdded(newTransaction);
+      }
     }
   };
 
