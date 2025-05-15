@@ -76,12 +76,33 @@ function App() {
               fetchedTransactions.length
             );
 
+            // Remover possíveis duplicatas pelo ID
+            const uniqueTransactions = [];
+            const seenIds = new Set();
+
+            fetchedTransactions.forEach((transaction) => {
+              if (!seenIds.has(transaction.id)) {
+                seenIds.add(transaction.id);
+                uniqueTransactions.push(transaction);
+              } else {
+                console.warn(
+                  "App: Transação duplicada detectada e removida:",
+                  transaction.id
+                );
+              }
+            });
+
+            console.log(
+              "App: Transações únicas após filtragem:",
+              uniqueTransactions.length
+            );
+
             // Ordenar por data (mais recentes primeiro)
-            fetchedTransactions.sort(
+            uniqueTransactions.sort(
               (a, b) => new Date(b.date) - new Date(a.date)
             );
 
-            setTransactions(fetchedTransactions);
+            setTransactions(uniqueTransactions);
             setLoadingTransactions(false);
           },
           (error) => {

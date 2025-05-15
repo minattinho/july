@@ -399,25 +399,51 @@ export default function FinanceOrganizer({
             name: tag.name,
             color: tag.color,
           })),
+          // Adiciona um token único para cada transação ajudando a prevenir duplicação
+          transactionToken: `${userId}_${description}_${baseAmount}_${Date.now()}`,
         };
 
         if (networkStatus) {
           try {
             setSyncStatus("syncing");
 
-            const docRef = await addDoc(
-              collection(db, "transactions"),
-              newTransaction
+            // Verificar se uma transação similar existe no último minuto
+            // (para prevenir duplicação por cliques múltiplos no servidor)
+            const oneMinuteAgo = new Date();
+            oneMinuteAgo.setMinutes(oneMinuteAgo.getMinutes() - 1);
+
+            const recentTransactionsRef = collection(db, "transactions");
+            const q = query(
+              recentTransactionsRef,
+              where("userId", "==", userId),
+              where("description", "==", description),
+              where("createdAt", ">=", oneMinuteAgo.toISOString())
             );
-            const addedTransaction = {
-              id: docRef.id,
-              ...newTransaction,
-            };
 
-            // Verificar limite de gastos para notificações
-            await checkSpendingLimit(userId, addedTransaction);
+            const querySnapshot = await getDocs(q);
 
-            setSyncStatus("synced");
+            if (!querySnapshot.empty) {
+              console.warn(
+                "Transação similar encontrada no último minuto. Possível duplicação evitada."
+              );
+              // Apenas atualizamos o status sem criar nova transação
+              setSyncStatus("synced");
+            } else {
+              // Nenhuma duplicata encontrada, podemos adicionar a transação
+              const docRef = await addDoc(
+                collection(db, "transactions"),
+                newTransaction
+              );
+              const addedTransaction = {
+                id: docRef.id,
+                ...newTransaction,
+              };
+
+              // Verificar limite de gastos para notificações
+              await checkSpendingLimit(userId, addedTransaction);
+
+              setSyncStatus("synced");
+            }
           } catch (error) {
             console.error("Erro ao adicionar transação:", error);
             setSyncStatus("error");
@@ -664,49 +690,62 @@ export default function FinanceOrganizer({
     }
   };
 
+  // Função para cálculos que lida com possíveis errors de tipo
+  const safeCalculation = (transactions, filterFn, calculationFn) => {
+    try {
+      // Garantir que transactions é um array antes de chamar filter
+      if (!Array.isArray(transactions)) {
+        console.error("Erro: Não é um array:", transactions);
+        return 0;
+      }
+
+      const filteredTransactions = filterFn
+        ? transactions.filter(filterFn)
+        : transactions;
+      return calculationFn(filteredTransactions);
+    } catch (error) {
+      console.error("Erro durante o cálculo:", error);
+      return 0;
+    }
+  };
+
   // Funções de cálculo e formatação
   const calculateBalance = () => {
-    try {
-      return appTransactions
-        .reduce((acc, transaction) => {
-          const amount = parseFloat(transaction.amount) || 0;
-          return acc + amount;
-        }, 0)
-        .toFixed(2);
-    } catch (error) {
-      console.error("Erro ao calcular saldo:", error);
-      return "0.00";
-    }
+    return safeCalculation(appTransactions, null, (transactions) => {
+      const balance = transactions.reduce((acc, transaction) => {
+        const amount = parseFloat(transaction.amount) || 0;
+        return acc + amount;
+      }, 0);
+      return balance.toFixed(2);
+    });
   };
 
   const calculateIncome = () => {
-    try {
-      return appTransactions
-        .filter((transaction) => parseFloat(transaction.amount) > 0)
-        .reduce((acc, transaction) => {
+    return safeCalculation(
+      appTransactions,
+      (transaction) => parseFloat(transaction.amount) > 0,
+      (transactions) => {
+        const income = transactions.reduce((acc, transaction) => {
           const amount = parseFloat(transaction.amount) || 0;
           return acc + amount;
-        }, 0)
-        .toFixed(2);
-    } catch (error) {
-      console.error("Erro ao calcular receitas:", error);
-      return "0.00";
-    }
+        }, 0);
+        return income.toFixed(2);
+      }
+    );
   };
 
   const calculateExpenses = () => {
-    try {
-      return appTransactions
-        .filter((transaction) => parseFloat(transaction.amount) < 0)
-        .reduce((acc, transaction) => {
+    return safeCalculation(
+      appTransactions,
+      (transaction) => parseFloat(transaction.amount) < 0,
+      (transactions) => {
+        const expenses = transactions.reduce((acc, transaction) => {
           const amount = parseFloat(transaction.amount) || 0;
           return acc + amount;
-        }, 0)
-        .toFixed(2);
-    } catch (error) {
-      console.error("Erro ao calcular despesas:", error);
-      return "0.00";
-    }
+        }, 0);
+        return expenses.toFixed(2);
+      }
+    );
   };
 
   const formatDate = (dateString) => {
