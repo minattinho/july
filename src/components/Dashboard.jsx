@@ -11,8 +11,24 @@ import {
   PieChart,
   Pie,
   Cell,
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  RadarChart,
+  Radar,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
 } from "recharts";
-import { format, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  isWithinInterval,
+  subMonths,
+  addMonths,
+} from "date-fns";
 import { ptBR } from "date-fns/locale";
 import "./Dashboard.css";
 
@@ -23,6 +39,10 @@ const COLORS = [
   "#FF8042",
   "#8884D8",
   "#82CA9D",
+  "#8DD1E1",
+  "#A4DE6C",
+  "#D0ED57",
+  "#F5D36C",
 ];
 
 const Dashboard = ({ transactions }) => {
@@ -30,6 +50,13 @@ const Dashboard = ({ transactions }) => {
   const [monthlyData, setMonthlyData] = useState([]);
   const [categoryData, setCategoryData] = useState([]);
   const [paymentMethodData, setPaymentMethodData] = useState([]);
+  const [trendData, setTrendData] = useState([]);
+  const [radarData, setRadarData] = useState([]);
+  const [comparisonData, setComparisonData] = useState({
+    income: 0,
+    expenses: 0,
+    savingsRate: 0,
+  });
   const [summary, setSummary] = useState({
     totalIncome: 0,
     totalExpenses: 0,
@@ -94,6 +121,17 @@ const Dashboard = ({ transactions }) => {
     return months.reverse();
   };
 
+  // Função para filtrar transações dentro de um intervalo de datas
+  const getFilteredTransactions = (startDate, endDate) => {
+    return transactions.filter((transaction) => {
+      const transactionDate = new Date(transaction.date);
+      return isWithinInterval(transactionDate, {
+        start: startDate,
+        end: endDate,
+      });
+    });
+  };
+
   // Lista de meses para o seletor
   const months = getLast12Months();
 
@@ -104,14 +142,19 @@ const Dashboard = ({ transactions }) => {
     const firstDayOfMonth = startOfMonth(selectedMonth);
     const lastDayOfMonth = endOfMonth(selectedMonth);
 
+    // Mês anterior para comparação
+    const firstDayPrevMonth = startOfMonth(subMonths(selectedMonth, 1));
+    const lastDayPrevMonth = endOfMonth(subMonths(selectedMonth, 1));
+
     // Filtrar transações apenas do mês selecionado
-    const monthTransactions = transactions.filter((transaction) => {
-      const transactionDate = new Date(transaction.date);
-      return isWithinInterval(transactionDate, {
-        start: firstDayOfMonth,
-        end: lastDayOfMonth,
-      });
-    });
+    const monthTransactions = getFilteredTransactions(
+      firstDayOfMonth,
+      lastDayOfMonth
+    );
+    const prevMonthTransactions = getFilteredTransactions(
+      firstDayPrevMonth,
+      lastDayPrevMonth
+    );
 
     // Processar dados diários dentro do mês selecionado
     const dailyTransactions = monthTransactions.reduce((acc, transaction) => {
@@ -157,12 +200,12 @@ const Dashboard = ({ transactions }) => {
       {}
     );
 
-    const categoryChartData = Object.entries(categoryTransactions).map(
-      ([category, amount]) => ({
+    const categoryChartData = Object.entries(categoryTransactions)
+      .map(([category, amount]) => ({
         name: getCategoryName(category),
         value: amount,
-      })
-    );
+      }))
+      .sort((a, b) => b.value - a.value); // Ordenar por valor
 
     // Processar dados por método de pagamento apenas do mês atual
     const paymentMethodTransactions = monthTransactions.reduce(
@@ -183,6 +226,43 @@ const Dashboard = ({ transactions }) => {
       value: amount,
     }));
 
+    // Dados para o gráfico radar - proporção de gastos por categoria
+    const totalExpense = Object.values(categoryTransactions).reduce(
+      (sum, value) => sum + value,
+      0
+    );
+
+    const radarChartData = Object.entries(categoryTransactions)
+      .map(([category, amount]) => ({
+        category: getCategoryName(category),
+        value: totalExpense > 0 ? (amount / totalExpense) * 100 : 0,
+      }))
+      .filter((item) => item.value > 0); // Remover categorias sem gastos
+
+    // Dados para o gráfico de tendência (últimos 6 meses)
+    const trendChartData = [];
+    for (let i = 5; i >= 0; i--) {
+      const monthDate = subMonths(selectedMonth, i);
+      const monthStart = startOfMonth(monthDate);
+      const monthEnd = endOfMonth(monthDate);
+      const monthTxs = getFilteredTransactions(monthStart, monthEnd);
+
+      const monthIncome = monthTxs
+        .filter((t) => t.type === "income")
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      const monthExpense = monthTxs
+        .filter((t) => t.type === "expense")
+        .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+      trendChartData.push({
+        month: format(monthDate, "MMM", { locale: ptBR }),
+        income: monthIncome,
+        expenses: monthExpense,
+        balance: monthIncome - monthExpense,
+      });
+    }
+
     // Calcular resumo do mês atual
     const totalIncome = monthTransactions
       .filter((t) => t.type === "income")
@@ -200,9 +280,39 @@ const Dashboard = ({ transactions }) => {
           monthTransactions.length
         : 0;
 
+    // Calcular dados do mês anterior para comparação
+    const prevIncome = prevMonthTransactions
+      .filter((t) => t.type === "income")
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const prevExpenses = prevMonthTransactions
+      .filter((t) => t.type === "expense")
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+    const prevBalance = prevIncome - prevExpenses;
+    const prevSavingsRate =
+      prevIncome > 0 ? (prevBalance / prevIncome) * 100 : 0;
+
+    // Calcular variações percentuais
+    const incomeChange =
+      prevIncome > 0 ? ((totalIncome - prevIncome) / prevIncome) * 100 : 0;
+    const expensesChange =
+      prevExpenses > 0
+        ? ((totalExpenses - prevExpenses) / prevExpenses) * 100
+        : 0;
+    const savingsRateChange =
+      prevSavingsRate > 0 ? savingsRate - prevSavingsRate : 0;
+
     setMonthlyData(dailyChartData);
     setCategoryData(categoryChartData);
     setPaymentMethodData(paymentMethodChartData);
+    setTrendData(trendChartData);
+    setRadarData(radarChartData);
+    setComparisonData({
+      income: incomeChange,
+      expenses: expensesChange,
+      savingsRate: savingsRateChange,
+    });
     setSummary({
       totalIncome,
       totalExpenses,
@@ -212,39 +322,88 @@ const Dashboard = ({ transactions }) => {
     });
   }, [transactions, selectedMonth]);
 
+  // Formatação de valores para o tooltip
+  const currencyFormatter = (value) => `R$ ${value.toFixed(2)}`;
+
+  // Função para navegar para o mês anterior ou próximo
+  const navigateMonth = (direction) => {
+    const newDate =
+      direction === "prev"
+        ? subMonths(selectedMonth, 1)
+        : addMonths(selectedMonth, 1);
+    setSelectedMonth(newDate);
+  };
+
   // Função para tratar a mudança do mês selecionado
   const handleMonthChange = (e) => {
     setSelectedMonth(new Date(e.target.value));
   };
 
+  // Componente para exibir a variação em relação ao mês anterior
+  const ChangeIndicator = ({ value, inverted = false }) => {
+    // Se inverted for true, valores negativos são bons (ex: redução de despesas)
+    const isPositive = inverted ? value <= 0 : value >= 0;
+    const displayValue = Math.abs(value).toFixed(1);
+
+    return (
+      <span
+        className={`change-indicator ${isPositive ? "positive" : "negative"}`}
+      >
+        {isPositive ? "↑" : "↓"} {displayValue}%
+      </span>
+    );
+  };
+
   return (
     <div className="dashboard">
       <div className="month-selector">
-        <h2>Resumo Mensal</h2>
-        <select
-          value={format(selectedMonth, "yyyy-MM")}
-          onChange={handleMonthChange}
-          className="month-select"
+        <button
+          className="month-nav-btn"
+          onClick={() => navigateMonth("prev")}
+          aria-label="Mês anterior"
         >
-          {months.map((month) => (
-            <option
-              key={format(month, "yyyy-MM")}
-              value={format(month, "yyyy-MM")}
-            >
-              {format(month, "MMMM/yyyy", { locale: ptBR })}
-            </option>
-          ))}
-        </select>
+          ←
+        </button>
+        <div>
+          <h2>Resumo Mensal</h2>
+          <select
+            value={format(selectedMonth, "yyyy-MM")}
+            onChange={handleMonthChange}
+            className="month-select"
+          >
+            {months.map((month) => (
+              <option
+                key={format(month, "yyyy-MM")}
+                value={format(month, "yyyy-MM")}
+              >
+                {format(month, "MMMM/yyyy", { locale: ptBR })}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button
+          className="month-nav-btn"
+          onClick={() => navigateMonth("next")}
+          aria-label="Próximo mês"
+        >
+          →
+        </button>
       </div>
 
       <div className="summary-cards">
         <div className="card">
           <h3>Receitas</h3>
           <p className="value income">R$ {summary.totalIncome.toFixed(2)}</p>
+          {comparisonData.income !== 0 && (
+            <ChangeIndicator value={comparisonData.income} />
+          )}
         </div>
         <div className="card">
           <h3>Despesas</h3>
           <p className="value expense">R$ {summary.totalExpenses.toFixed(2)}</p>
+          {comparisonData.expenses !== 0 && (
+            <ChangeIndicator value={comparisonData.expenses} inverted={true} />
+          )}
         </div>
         <div className="card">
           <h3>Saldo</h3>
@@ -255,6 +414,9 @@ const Dashboard = ({ transactions }) => {
         <div className="card">
           <h3>Taxa de Poupança</h3>
           <p className="value">{summary.savingsRate.toFixed(1)}%</p>
+          {comparisonData.savingsRate !== 0 && (
+            <ChangeIndicator value={comparisonData.savingsRate} />
+          )}
         </div>
         <div className="card">
           <h3>Média por Transação</h3>
@@ -263,6 +425,43 @@ const Dashboard = ({ transactions }) => {
       </div>
 
       <div className="charts">
+        <div className="chart-container trend-chart">
+          <h3>Tendência nos Últimos 6 Meses</h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart data={trendData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="month" />
+              <YAxis />
+              <Tooltip formatter={currencyFormatter} />
+              <Legend />
+              <Area
+                type="monotone"
+                dataKey="income"
+                name="Receitas"
+                stroke="#00C49F"
+                fill="#00C49F"
+                fillOpacity={0.3}
+              />
+              <Area
+                type="monotone"
+                dataKey="expenses"
+                name="Despesas"
+                stroke="#FF8042"
+                fill="#FF8042"
+                fillOpacity={0.3}
+              />
+              <Area
+                type="monotone"
+                dataKey="balance"
+                name="Saldo"
+                stroke="#8884D8"
+                fill="#8884D8"
+                fillOpacity={0.3}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+
         <div className="chart-container">
           <h3>
             Fluxo Diário -{" "}
@@ -273,12 +472,45 @@ const Dashboard = ({ transactions }) => {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="day" />
               <YAxis />
-              <Tooltip />
+              <Tooltip formatter={currencyFormatter} />
               <Legend />
-              <Bar dataKey="income" name="Receitas" fill="#00C49F" />
-              <Bar dataKey="expenses" name="Despesas" fill="#FF8042" />
-              <Bar dataKey="balance" name="Saldo" fill="#8884D8" />
+              <Bar
+                dataKey="income"
+                name="Receitas"
+                fill="#00C49F"
+                radius={[4, 4, 0, 0]}
+              />
+              <Bar
+                dataKey="expenses"
+                name="Despesas"
+                fill="#FF8042"
+                radius={[4, 4, 0, 0]}
+              />
             </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="chart-container">
+          <h3>
+            Saldo Diário -{" "}
+            {format(selectedMonth, "MMMM/yyyy", { locale: ptBR })}
+          </h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={monthlyData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="day" />
+              <YAxis />
+              <Tooltip formatter={currencyFormatter} />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey="balance"
+                name="Saldo"
+                stroke="#8884D8"
+                activeDot={{ r: 8 }}
+                strokeWidth={2}
+              />
+            </LineChart>
           </ResponsiveContainer>
         </div>
 
@@ -296,7 +528,11 @@ const Dashboard = ({ transactions }) => {
                 cx="50%"
                 cy="50%"
                 outerRadius={100}
-                label
+                label={({ name, percent }) =>
+                  `${name}: ${(percent * 100).toFixed(1)}%`
+                }
+                labelLine={false}
+                animationDuration={500}
               >
                 {categoryData.map((entry, index) => (
                   <Cell
@@ -305,8 +541,8 @@ const Dashboard = ({ transactions }) => {
                   />
                 ))}
               </Pie>
-              <Tooltip />
-              <Legend />
+              <Tooltip formatter={(value) => `R$ ${value.toFixed(2)}`} />
+              <Legend layout="vertical" verticalAlign="middle" align="right" />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -325,7 +561,11 @@ const Dashboard = ({ transactions }) => {
                 cx="50%"
                 cy="50%"
                 outerRadius={100}
-                label
+                label={({ name, percent }) =>
+                  `${name}: ${(percent * 100).toFixed(1)}%`
+                }
+                labelLine={false}
+                animationDuration={500}
               >
                 {paymentMethodData.map((entry, index) => (
                   <Cell
@@ -334,9 +574,28 @@ const Dashboard = ({ transactions }) => {
                   />
                 ))}
               </Pie>
-              <Tooltip />
-              <Legend />
+              <Tooltip formatter={(value) => `R$ ${value.toFixed(2)}`} />
+              <Legend layout="vertical" verticalAlign="middle" align="right" />
             </PieChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="chart-container">
+          <h3>Proporção de Gastos por Categoria</h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
+              <PolarGrid />
+              <PolarAngleAxis dataKey="category" />
+              <PolarRadiusAxis angle={30} domain={[0, 100]} label="%" />
+              <Radar
+                name="Proporção"
+                dataKey="value"
+                stroke="#8884d8"
+                fill="#8884d8"
+                fillOpacity={0.6}
+              />
+              <Tooltip formatter={(value) => `${value.toFixed(1)}%`} />
+            </RadarChart>
           </ResponsiveContainer>
         </div>
       </div>
