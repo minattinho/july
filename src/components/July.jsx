@@ -1,53 +1,58 @@
 // src/components/FinanceOrganizer.jsx
-import { useState, useEffect } from 'react';
-import { db } from '../firebase';
-import { 
-  collection, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
-  query, 
-  where, 
-  getDocs, 
-  orderBy, 
+import { useState, useEffect } from "react";
+import { db } from "../firebase";
+import {
+  collection,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  query,
+  where,
+  getDocs,
+  orderBy,
   writeBatch,
   onSnapshot,
-  serverTimestamp 
-} from 'firebase/firestore';
-import { TagSelector } from './FinanceOrganizerExtended';
-import { checkSpendingLimit, checkGoalDeadlines, checkRecurringTransactions } from '../utils/notificationSystem';
-import './July.css';
-import './TagSelector.css';
+  serverTimestamp,
+} from "firebase/firestore";
+import { TagSelector } from "./FinanceOrganizerExtended";
+import TransactionsList from "./TransactionsList";
+import {
+  checkSpendingLimit,
+  checkGoalDeadlines,
+  checkRecurringTransactions,
+} from "../utils/notificationSystem";
+import "./July.css";
+import "./TagSelector.css";
 
 // Utilitário para garantir que temos uma data válida
 const ensureValidDate = (date) => {
   try {
     if (!date) return new Date();
-    
+
     if (date instanceof Date) {
       return isNaN(date.getTime()) ? new Date() : date;
     }
-    
-    if (typeof date === 'string') {
+
+    if (typeof date === "string") {
       const parsedDate = new Date(date);
       return isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
     }
-    
-    if (date && typeof date === 'object' && date.toDate) {
+
+    if (date && typeof date === "object" && date.toDate) {
       try {
         const firestoreDate = date.toDate();
         return isNaN(firestoreDate.getTime()) ? new Date() : firestoreDate;
       } catch (e) {
-        console.error('Erro ao converter timestamp do Firestore:', e);
+        console.error("Erro ao converter timestamp do Firestore:", e);
         return new Date();
       }
     }
-    
+
     // Fallback para casos não tratados
     return new Date();
   } catch (e) {
-    console.error('Erro ao processar data:', e);
+    console.error("Erro ao processar data:", e);
     return new Date();
   }
 };
@@ -55,159 +60,159 @@ const ensureValidDate = (date) => {
 export default function FinanceOrganizer({ userId, onTransactionAdded }) {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [description, setDescription] = useState('');
-  const [amount, setAmount] = useState('');
-  const [type, setType] = useState('expense');
-  const [category, setCategory] = useState('general_expense');
-  const [paymentMethod, setPaymentMethod] = useState('money');
+  const [description, setDescription] = useState("");
+  const [amount, setAmount] = useState("");
+  const [type, setType] = useState("expense");
+  const [category, setCategory] = useState("general_expense");
+  const [paymentMethod, setPaymentMethod] = useState("money");
   const [isRecurring, setIsRecurring] = useState(false);
   const [installments, setInstallments] = useState(1);
-  const [activeScreen, setActiveScreen] = useState('register');
-  const [syncStatus, setSyncStatus] = useState('synced');
+  const [activeScreen, setActiveScreen] = useState("register");
+  const [syncStatus, setSyncStatus] = useState("synced");
   const [networkStatus, setNetworkStatus] = useState(navigator.onLine);
   const [offlineTransactions, setOfflineTransactions] = useState([]);
   const [selectedTags, setSelectedTags] = useState([]);
-  
+
   // Categorias separadas para despesas e receitas
   const expenseCategories = [
-    { id: 'general_expense', name: 'Geral' },
-    { id: 'food', name: 'Alimentação' },
-    { id: 'transport', name: 'Transporte' },
-    { id: 'housing', name: 'Moradia' },
-    { id: 'entertainment', name: 'Lazer' },
-    { id: 'health', name: 'Saúde' },
-    { id: 'education', name: 'Educação' },
-    { id: 'clothing', name: 'Vestuário' },
-    { id: 'utilities', name: 'Contas & Serviços' }
+    { id: "general_expense", name: "Geral" },
+    { id: "food", name: "Alimentação" },
+    { id: "transport", name: "Transporte" },
+    { id: "housing", name: "Moradia" },
+    { id: "entertainment", name: "Lazer" },
+    { id: "health", name: "Saúde" },
+    { id: "education", name: "Educação" },
+    { id: "clothing", name: "Vestuário" },
+    { id: "utilities", name: "Contas & Serviços" },
   ];
-  
+
   // Métodos de pagamento
   const paymentMethods = [
-    { id: 'money', name: 'Dinheiro' },
-    { id: 'debit_card', name: 'Cartão de Débito' },
-    { id: 'credit_card', name: 'Cartão de Crédito' },
-    { id: 'pix', name: 'Pix' },
-    { id: 'bank_transfer', name: 'Transferência' },
-    { id: 'bill', name: 'Boleto' }
+    { id: "money", name: "Dinheiro" },
+    { id: "debit_card", name: "Cartão de Débito" },
+    { id: "credit_card", name: "Cartão de Crédito" },
+    { id: "pix", name: "Pix" },
+    { id: "bank_transfer", name: "Transferência" },
+    { id: "bill", name: "Boleto" },
   ];
-  
+
   const incomeCategories = [
-    { id: 'general_income', name: 'Geral' },
-    { id: 'salary', name: 'Salário' },
-    { id: 'freelance', name: 'Freelance' },
-    { id: 'investments', name: 'Investimentos' },
-    { id: 'gifts', name: 'Presentes' },
-    { id: 'sales', name: 'Vendas' },
-    { id: 'rental', name: 'Aluguel' },
-    { id: 'refunds', name: 'Reembolsos' }
+    { id: "general_income", name: "Geral" },
+    { id: "salary", name: "Salário" },
+    { id: "freelance", name: "Freelance" },
+    { id: "investments", name: "Investimentos" },
+    { id: "gifts", name: "Presentes" },
+    { id: "sales", name: "Vendas" },
+    { id: "rental", name: "Aluguel" },
+    { id: "refunds", name: "Reembolsos" },
   ];
-  
+
   // Monitor network status
   useEffect(() => {
     const handleOnline = () => setNetworkStatus(true);
     const handleOffline = () => setNetworkStatus(false);
-    
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
     };
   }, []);
-  
+
   // Load offline transactions
   useEffect(() => {
-    const savedOfflineTransactions = localStorage.getItem('offlineTransactions');
+    const savedOfflineTransactions = localStorage.getItem(
+      "offlineTransactions"
+    );
     if (savedOfflineTransactions) {
       setOfflineTransactions(JSON.parse(savedOfflineTransactions));
     }
   }, []);
-  
+
   // Synchronize offline transactions when back online
   useEffect(() => {
     if (networkStatus && offlineTransactions.length > 0 && userId) {
       syncOfflineTransactions();
     }
   }, [networkStatus, offlineTransactions, userId]);
-  
+
   // Sincronizar transações offline
   const syncOfflineTransactions = async () => {
     if (offlineTransactions.length === 0) return;
-    
-    setSyncStatus('syncing');
-    
+
+    setSyncStatus("syncing");
+
     try {
       // Use batch for better performance and atomicity
       const batch = writeBatch(db);
-      
+
       // Process each offline transaction
       for (const transaction of offlineTransactions) {
-        if (transaction._operation === 'add') {
+        if (transaction._operation === "add") {
           // For new transactions
           const { _operation, _localId, ...transactionData } = transaction;
-          const newDocRef = doc(collection(db, 'transactions'));
+          const newDocRef = doc(collection(db, "transactions"));
           batch.set(newDocRef, {
             ...transactionData,
             userId,
-            syncedAt: serverTimestamp()
+            syncedAt: serverTimestamp(),
           });
-        } else if (transaction._operation === 'delete' && transaction.id) {
+        } else if (transaction._operation === "delete" && transaction.id) {
           // For deleted transactions
-          batch.delete(doc(db, 'transactions', transaction.id));
+          batch.delete(doc(db, "transactions", transaction.id));
         }
       }
-      
+
       // Commit the batch
       await batch.commit();
-      
+
       // Clear offline transactions
       setOfflineTransactions([]);
-      localStorage.removeItem('offlineTransactions');
-      
+      localStorage.removeItem("offlineTransactions");
+
       // Refresh transactions list (real-time listener will handle this)
-      setSyncStatus('synced');
+      setSyncStatus("synced");
     } catch (error) {
-      console.error('Erro ao sincronizar transações offline:', error);
-      setSyncStatus('error');
+      console.error("Erro ao sincronizar transações offline:", error);
+      setSyncStatus("error");
     }
   };
-  
+
   // Função para obter todas as categorias (para exibição)
   const getAllCategories = () => {
     return [...expenseCategories, ...incomeCategories];
   };
-  
+
   // Load transactions from Firestore with real-time updates
   useEffect(() => {
     if (!userId) return;
-    
+
     setLoading(true);
-    
-    const transactionsRef = collection(db, 'transactions');
-    const q = query(
-      transactionsRef,
-      where('userId', '==', userId)
-    );
-    
+
+    const transactionsRef = collection(db, "transactions");
+    const q = query(transactionsRef, where("userId", "==", userId));
+
     try {
-      const unsubscribe = onSnapshot(q, 
+      const unsubscribe = onSnapshot(
+        q,
         (snapshot) => {
-          const fetchedTransactions = snapshot.docs.map(doc => {
+          const fetchedTransactions = snapshot.docs.map((doc) => {
             const data = doc.data();
-            
+
             // Usar nossa função utilitária para garantir uma data válida
             const validDate = ensureValidDate(data.date);
-            
+
             return {
               id: doc.id,
               ...data,
               date: validDate.toISOString(),
               // Garantir que valores numéricos são realmente números
-              amount: parseFloat(data.amount) || 0
+              amount: parseFloat(data.amount) || 0,
             };
           });
-          
+
           // Ordenação segura
           try {
             fetchedTransactions.sort((a, b) => {
@@ -216,80 +221,80 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
               return dateB.getTime() - dateA.getTime();
             });
           } catch (error) {
-            console.error('Erro durante a ordenação:', error);
+            console.error("Erro durante a ordenação:", error);
           }
-          
+
           setTransactions(fetchedTransactions);
           setLoading(false);
-          setSyncStatus('synced');
+          setSyncStatus("synced");
         },
         (error) => {
-          console.error('Erro ao buscar transações:', error);
+          console.error("Erro ao buscar transações:", error);
           setLoading(false);
-          setSyncStatus('error');
-          
-          const cachedTransactions = localStorage.getItem('cachedTransactions');
+          setSyncStatus("error");
+
+          const cachedTransactions = localStorage.getItem("cachedTransactions");
           if (cachedTransactions) {
             setTransactions(JSON.parse(cachedTransactions));
           }
         }
       );
-      
+
       return () => unsubscribe();
     } catch (error) {
-      console.error('Erro ao configurar listener de transações:', error);
+      console.error("Erro ao configurar listener de transações:", error);
       setLoading(false);
-      setSyncStatus('error');
+      setSyncStatus("error");
     }
   }, [userId]);
-  
+
   // Cache transactions in localStorage for offline access
   useEffect(() => {
     if (transactions.length > 0) {
-      localStorage.setItem('cachedTransactions', JSON.stringify(transactions));
+      localStorage.setItem("cachedTransactions", JSON.stringify(transactions));
     }
   }, [transactions]);
-  
+
   // Efeito para atualizar a categoria quando o tipo mudar
   useEffect(() => {
-    if (type === 'expense') {
-      setCategory('general_expense');
+    if (type === "expense") {
+      setCategory("general_expense");
     } else {
-      setCategory('general_income');
+      setCategory("general_income");
       setIsRecurring(false);
       setInstallments(1);
     }
   }, [type]);
-  
+
   // Adicionar transação
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!description || !amount) return;
-    
+
     // Garantir que o valor é um número válido
     const parsedAmount = parseFloat(amount);
     if (isNaN(parsedAmount)) {
-      alert('Por favor, insira um valor válido.');
+      alert("Por favor, insira um valor válido.");
       return;
     }
-    
+
     const baseAmount = parsedAmount;
     const now = new Date();
     const transactionDate = now.toISOString();
-    
+
     // Handle installments
-    if (isRecurring && type === 'expense' && installments > 1) {
+    if (isRecurring && type === "expense" && installments > 1) {
       const installmentAmount = baseAmount / installments;
       const groupId = Date.now().toString();
       const newTransactions = [];
-      
+
       for (let i = 0; i < installments; i++) {
         const installmentDate = new Date();
         installmentDate.setMonth(now.getMonth() + i);
-        
+
         const newTransaction = {
           userId,
-          description: `${description} (${i+1}/${installments})`,
+          description: `${description} (${i + 1}/${installments})`,
           amount: -installmentAmount,
           type,
           category,
@@ -297,80 +302,98 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
           date: installmentDate.toISOString(),
           isRecurring,
           groupId,
-          tags: selectedTags.map(tag => ({
+          tags: selectedTags.map((tag) => ({
             id: tag.id,
             name: tag.name,
-            color: tag.color
-          }))
+            color: tag.color,
+          })),
         };
-        
+
         newTransactions.push(newTransaction);
       }
-      
+
       if (networkStatus) {
         try {
-          setSyncStatus('syncing');
-          
+          setSyncStatus("syncing");
+
           // Use batch for better performance
           const batch = writeBatch(db);
-          
-          newTransactions.forEach(transaction => {
-            const newDocRef = doc(collection(db, 'transactions'));
+
+          newTransactions.forEach((transaction) => {
+            const newDocRef = doc(collection(db, "transactions"));
             batch.set(newDocRef, transaction);
           });
-          
+
           await batch.commit();
-          
+
           // Verificar a primeira parcela para notificações
           const firstInstallment = {
             id: newDocRef.id,
-            ...newTransactions[0]
+            ...newTransactions[0],
           };
           await checkSpendingLimit(userId, firstInstallment);
-          
+
           // Verificar transações recorrentes
           await checkRecurringTransactions(userId);
-          
-          setSyncStatus('synced');
-          
+
+          setSyncStatus("synced");
+
           // Notificar o componente pai
           if (onTransactionAdded) {
             onTransactionAdded(newTransactions[0]);
           }
         } catch (error) {
-          console.error('Erro ao adicionar transações:', error);
-          setSyncStatus('error');
-          
+          console.error("Erro ao adicionar transações:", error);
+          setSyncStatus("error");
+
           // Store offline for later sync
-          const offlineTransactionsToAdd = newTransactions.map(transaction => ({
-            ...transaction,
-            _operation: 'add',
-            _localId: `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-          }));
-          
-          const updatedOfflineTransactions = [...offlineTransactions, ...offlineTransactionsToAdd];
+          const offlineTransactionsToAdd = newTransactions.map(
+            (transaction) => ({
+              ...transaction,
+              _operation: "add",
+              _localId: `local_${Date.now()}_${Math.random()
+                .toString(36)
+                .substr(2, 9)}`,
+            })
+          );
+
+          const updatedOfflineTransactions = [
+            ...offlineTransactions,
+            ...offlineTransactionsToAdd,
+          ];
           setOfflineTransactions(updatedOfflineTransactions);
-          localStorage.setItem('offlineTransactions', JSON.stringify(updatedOfflineTransactions));
+          localStorage.setItem(
+            "offlineTransactions",
+            JSON.stringify(updatedOfflineTransactions)
+          );
         }
       } else {
         // Store offline for later sync
-        const offlineTransactionsToAdd = newTransactions.map(transaction => ({
+        const offlineTransactionsToAdd = newTransactions.map((transaction) => ({
           ...transaction,
-          _operation: 'add',
-          _localId: `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+          _operation: "add",
+          _localId: `local_${Date.now()}_${Math.random()
+            .toString(36)
+            .substr(2, 9)}`,
         }));
-        
-        const updatedOfflineTransactions = [...offlineTransactions, ...offlineTransactionsToAdd];
+
+        const updatedOfflineTransactions = [
+          ...offlineTransactions,
+          ...offlineTransactionsToAdd,
+        ];
         setOfflineTransactions(updatedOfflineTransactions);
-        localStorage.setItem('offlineTransactions', JSON.stringify(updatedOfflineTransactions));
-        
+        localStorage.setItem(
+          "offlineTransactions",
+          JSON.stringify(updatedOfflineTransactions)
+        );
+
         // Update local transactions view
-        const localTransactionsView = offlineTransactionsToAdd.map(t => ({
+        const localTransactionsView = offlineTransactionsToAdd.map((t) => ({
           ...t,
           id: t._localId,
-          date: t.date instanceof Date ? t.date.toISOString() : t.date
+          date: t.date instanceof Date ? t.date.toISOString() : t.date,
         }));
-        
+
         setTransactions([...localTransactionsView, ...transactions]);
       }
     } else {
@@ -378,312 +401,365 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
       const newTransaction = {
         userId,
         description,
-        amount: type === 'expense' ? -Math.abs(baseAmount) : Math.abs(baseAmount),
+        amount:
+          type === "expense" ? -Math.abs(baseAmount) : Math.abs(baseAmount),
         type,
         category,
         paymentMethod,
         date: now.toISOString(),
         isInstallment: false,
         createdAt: now.toISOString(),
-        tags: selectedTags.map(tag => ({
+        tags: selectedTags.map((tag) => ({
           id: tag.id,
           name: tag.name,
-          color: tag.color
-        }))
+          color: tag.color,
+        })),
       };
-      
+
       if (networkStatus) {
         try {
-          setSyncStatus('syncing');
-          
-          const docRef = await addDoc(collection(db, 'transactions'), newTransaction);
+          setSyncStatus("syncing");
+
+          const docRef = await addDoc(
+            collection(db, "transactions"),
+            newTransaction
+          );
           const addedTransaction = {
             id: docRef.id,
-            ...newTransaction
+            ...newTransaction,
           };
-          
+
           // Verificar limite de gastos para notificações
           await checkSpendingLimit(userId, addedTransaction);
-          
-          setSyncStatus('synced');
-          
+
+          setSyncStatus("synced");
+
           // Notificar o componente pai
           if (onTransactionAdded) {
             onTransactionAdded(addedTransaction);
           }
         } catch (error) {
-          console.error('Erro ao adicionar transação:', error);
-          setSyncStatus('error');
-          
+          console.error("Erro ao adicionar transação:", error);
+          setSyncStatus("error");
+
           // Store offline for later sync
           const offlineTransaction = {
             ...newTransaction,
-            _operation: 'add',
-            _localId: `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+            _operation: "add",
+            _localId: `local_${Date.now()}_${Math.random()
+              .toString(36)
+              .substr(2, 9)}`,
           };
-          
-          const updatedOfflineTransactions = [...offlineTransactions, offlineTransaction];
+
+          const updatedOfflineTransactions = [
+            ...offlineTransactions,
+            offlineTransaction,
+          ];
           setOfflineTransactions(updatedOfflineTransactions);
-          localStorage.setItem('offlineTransactions', JSON.stringify(updatedOfflineTransactions));
-          
+          localStorage.setItem(
+            "offlineTransactions",
+            JSON.stringify(updatedOfflineTransactions)
+          );
+
           // Update local transactions view
           setTransactions([
             {
               ...offlineTransaction,
               id: offlineTransaction._localId,
-              date: offlineTransaction.date instanceof Date ? 
-                offlineTransaction.date.toISOString() : 
-                offlineTransaction.date
+              date:
+                offlineTransaction.date instanceof Date
+                  ? offlineTransaction.date.toISOString()
+                  : offlineTransaction.date,
             },
-            ...transactions
+            ...transactions,
           ]);
         }
       } else {
         // Store offline for later sync
         const offlineTransaction = {
           ...newTransaction,
-          _operation: 'add',
-          _localId: `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+          _operation: "add",
+          _localId: `local_${Date.now()}_${Math.random()
+            .toString(36)
+            .substr(2, 9)}`,
         };
-        
-        const updatedOfflineTransactions = [...offlineTransactions, offlineTransaction];
+
+        const updatedOfflineTransactions = [
+          ...offlineTransactions,
+          offlineTransaction,
+        ];
         setOfflineTransactions(updatedOfflineTransactions);
-        localStorage.setItem('offlineTransactions', JSON.stringify(updatedOfflineTransactions));
-        
+        localStorage.setItem(
+          "offlineTransactions",
+          JSON.stringify(updatedOfflineTransactions)
+        );
+
         // Update local transactions view
         setTransactions([
           {
             ...offlineTransaction,
             id: offlineTransaction._localId,
-            date: offlineTransaction.date instanceof Date ? 
-              offlineTransaction.date.toISOString() : 
-              offlineTransaction.date
+            date:
+              offlineTransaction.date instanceof Date
+                ? offlineTransaction.date.toISOString()
+                : offlineTransaction.date,
           },
-          ...transactions
+          ...transactions,
         ]);
       }
     }
-    
+
     // Clear form
-    setDescription('');
-    setAmount('');
+    setDescription("");
+    setAmount("");
     setIsRecurring(false);
     setInstallments(1);
-    setPaymentMethod('money');
+    setPaymentMethod("money");
     setSelectedTags([]);
   };
-  
+
   // Excluir transação
   const deleteTransaction = async (id, groupId) => {
     // Check if it's a local temporary ID
-    const isLocalId = id.toString().startsWith('local_');
-    
+    const isLocalId = id.toString().startsWith("local_");
+
     if (groupId) {
-      if (window.confirm('Deseja excluir todas as parcelas desta compra?')) {
+      if (window.confirm("Deseja excluir todas as parcelas desta compra?")) {
         if (networkStatus && !isLocalId) {
           try {
-            setSyncStatus('syncing');
-            
+            setSyncStatus("syncing");
+
             // Fetch all transactions in the group
-            const transactionsRef = collection(db, 'transactions');
+            const transactionsRef = collection(db, "transactions");
             const q = query(
               transactionsRef,
-              where('userId', '==', userId),
-              where('groupId', '==', groupId)
+              where("userId", "==", userId),
+              where("groupId", "==", groupId)
             );
-            
+
             const querySnapshot = await getDocs(q);
-            
+
             // Delete all transactions in the group
             const batch = writeBatch(db);
             querySnapshot.docs.forEach((document) => {
-              batch.delete(doc(db, 'transactions', document.id));
+              batch.delete(doc(db, "transactions", document.id));
             });
-            
+
             await batch.commit();
-            setSyncStatus('synced');
+            setSyncStatus("synced");
           } catch (error) {
-            console.error('Erro ao excluir grupo de transações:', error);
-            setSyncStatus('error');
-            
+            console.error("Erro ao excluir grupo de transações:", error);
+            setSyncStatus("error");
+
             // Handle offline deletion
-            const groupTransactions = transactions.filter(t => t.groupId === groupId);
-            
+            const groupTransactions = transactions.filter(
+              (t) => t.groupId === groupId
+            );
+
             const updatedOfflineTransactions = [
               ...offlineTransactions,
-              ...groupTransactions.map(t => ({
+              ...groupTransactions.map((t) => ({
                 id: t.id,
-                _operation: 'delete'
-              }))
+                _operation: "delete",
+              })),
             ];
-            
+
             setOfflineTransactions(updatedOfflineTransactions);
-            localStorage.setItem('offlineTransactions', JSON.stringify(updatedOfflineTransactions));
-            
+            localStorage.setItem(
+              "offlineTransactions",
+              JSON.stringify(updatedOfflineTransactions)
+            );
+
             // Update local view
-            setTransactions(transactions.filter(t => t.groupId !== groupId));
+            setTransactions(transactions.filter((t) => t.groupId !== groupId));
           }
         } else {
           // Handle offline or local temporary ID deletion
-          const groupTransactions = transactions.filter(t => t.groupId === groupId);
-          
+          const groupTransactions = transactions.filter(
+            (t) => t.groupId === groupId
+          );
+
           if (isLocalId) {
             // If it's a local ID, remove from offline transactions
             const updatedOfflineTransactions = offlineTransactions.filter(
-              t => !t._localId || !groupTransactions.some(gt => gt.id === t._localId)
+              (t) =>
+                !t._localId ||
+                !groupTransactions.some((gt) => gt.id === t._localId)
             );
-            
+
             setOfflineTransactions(updatedOfflineTransactions);
-            localStorage.setItem('offlineTransactions', JSON.stringify(updatedOfflineTransactions));
+            localStorage.setItem(
+              "offlineTransactions",
+              JSON.stringify(updatedOfflineTransactions)
+            );
           } else {
             // Add to offline transactions for later deletion
             const updatedOfflineTransactions = [
               ...offlineTransactions,
-              ...groupTransactions.map(t => ({
+              ...groupTransactions.map((t) => ({
                 id: t.id,
-                _operation: 'delete'
-              }))
+                _operation: "delete",
+              })),
             ];
-            
+
             setOfflineTransactions(updatedOfflineTransactions);
-            localStorage.setItem('offlineTransactions', JSON.stringify(updatedOfflineTransactions));
+            localStorage.setItem(
+              "offlineTransactions",
+              JSON.stringify(updatedOfflineTransactions)
+            );
           }
-          
+
           // Update local view
-          setTransactions(transactions.filter(t => t.groupId !== groupId));
+          setTransactions(transactions.filter((t) => t.groupId !== groupId));
         }
       }
     } else {
       if (networkStatus && !isLocalId) {
         try {
-          setSyncStatus('syncing');
-          
-          await deleteDoc(doc(db, 'transactions', id));
-          
-          setSyncStatus('synced');
+          setSyncStatus("syncing");
+
+          await deleteDoc(doc(db, "transactions", id));
+
+          setSyncStatus("synced");
         } catch (error) {
-          console.error('Erro ao excluir transação:', error);
-          setSyncStatus('error');
-          
+          console.error("Erro ao excluir transação:", error);
+          setSyncStatus("error");
+
           // Add to offline transactions for later deletion
           const updatedOfflineTransactions = [
             ...offlineTransactions,
-            { id, _operation: 'delete' }
+            { id, _operation: "delete" },
           ];
-          
+
           setOfflineTransactions(updatedOfflineTransactions);
-          localStorage.setItem('offlineTransactions', JSON.stringify(updatedOfflineTransactions));
-          
+          localStorage.setItem(
+            "offlineTransactions",
+            JSON.stringify(updatedOfflineTransactions)
+          );
+
           // Update local view
-          setTransactions(transactions.filter(t => t.id !== id));
+          setTransactions(transactions.filter((t) => t.id !== id));
         }
       } else {
         if (isLocalId) {
           // If it's a local ID, remove from offline transactions
           const updatedOfflineTransactions = offlineTransactions.filter(
-            t => !t._localId || t._localId !== id
+            (t) => !t._localId || t._localId !== id
           );
-          
+
           setOfflineTransactions(updatedOfflineTransactions);
-          localStorage.setItem('offlineTransactions', JSON.stringify(updatedOfflineTransactions));
+          localStorage.setItem(
+            "offlineTransactions",
+            JSON.stringify(updatedOfflineTransactions)
+          );
         } else {
           // Add to offline transactions for later deletion
           const updatedOfflineTransactions = [
             ...offlineTransactions,
-            { id, _operation: 'delete' }
+            { id, _operation: "delete" },
           ];
-          
+
           setOfflineTransactions(updatedOfflineTransactions);
-          localStorage.setItem('offlineTransactions', JSON.stringify(updatedOfflineTransactions));
+          localStorage.setItem(
+            "offlineTransactions",
+            JSON.stringify(updatedOfflineTransactions)
+          );
         }
-        
+
         // Update local view
-        setTransactions(transactions.filter(t => t.id !== id));
+        setTransactions(transactions.filter((t) => t.id !== id));
       }
     }
   };
-  
+
   // Funções de cálculo e formatação
   const calculateBalance = () => {
     try {
-      return transactions.reduce((acc, transaction) => {
-        const amount = parseFloat(transaction.amount) || 0;
-        return acc + amount;
-      }, 0).toFixed(2);
+      return transactions
+        .reduce((acc, transaction) => {
+          const amount = parseFloat(transaction.amount) || 0;
+          return acc + amount;
+        }, 0)
+        .toFixed(2);
     } catch (error) {
-      console.error('Erro ao calcular saldo:', error);
-      return '0.00';
+      console.error("Erro ao calcular saldo:", error);
+      return "0.00";
     }
   };
-  
+
   const calculateIncome = () => {
     try {
       return transactions
-        .filter(transaction => parseFloat(transaction.amount) > 0)
+        .filter((transaction) => parseFloat(transaction.amount) > 0)
         .reduce((acc, transaction) => {
           const amount = parseFloat(transaction.amount) || 0;
           return acc + amount;
         }, 0)
         .toFixed(2);
     } catch (error) {
-      console.error('Erro ao calcular receitas:', error);
-      return '0.00';
+      console.error("Erro ao calcular receitas:", error);
+      return "0.00";
     }
   };
-  
+
   const calculateExpenses = () => {
     try {
       return transactions
-        .filter(transaction => parseFloat(transaction.amount) < 0)
+        .filter((transaction) => parseFloat(transaction.amount) < 0)
         .reduce((acc, transaction) => {
           const amount = parseFloat(transaction.amount) || 0;
           return acc + amount;
         }, 0)
         .toFixed(2);
     } catch (error) {
-      console.error('Erro ao calcular despesas:', error);
-      return '0.00';
+      console.error("Erro ao calcular despesas:", error);
+      return "0.00";
     }
   };
-  
+
   const formatDate = (dateString) => {
     try {
       const validDate = ensureValidDate(dateString);
       return validDate.toLocaleDateString();
     } catch (error) {
-      console.error('Erro ao formatar data:', error, dateString);
-      return 'Data inválida';
+      console.error("Erro ao formatar data:", error, dateString);
+      return "Data inválida";
     }
   };
-  
+
   const getCategoryName = (categoryId) => {
     const allCategories = getAllCategories();
-    const category = allCategories.find(cat => cat.id === categoryId);
-    return category ? category.name : 'Não categorizado';
+    const category = allCategories.find((cat) => cat.id === categoryId);
+    return category ? category.name : "Não categorizado";
   };
 
   const getPaymentMethodName = (methodId) => {
-    const method = paymentMethods.find(m => m.id === methodId);
-    return method ? method.name : 'Outros';
+    const method = paymentMethods.find((m) => m.id === methodId);
+    return method ? method.name : "Outros";
   };
-  
+
+  // Voltar para a tela de registro
+  const handleBackToRegister = () => {
+    setActiveScreen("register");
+  };
+
   // Renderização do componente
   return (
     <div className="finance-app">
       {/* Indicadores de status de sincronização */}
-      {syncStatus === 'syncing' && (
+      {syncStatus === "syncing" && (
         <div className="sync-indicator syncing">
           <span className="sync-icon">↻</span> Sincronizando dados...
         </div>
       )}
-      
-      {syncStatus === 'error' && (
+
+      {syncStatus === "error" && (
         <div className="sync-indicator error">
-          <span className="sync-icon">⚠</span> 
-          Erro de sincronização. 
+          <span className="sync-icon">⚠</span>
+          Erro de sincronização.
           {offlineTransactions.length > 0 && (
-            <button 
-              onClick={syncOfflineTransactions} 
+            <button
+              onClick={syncOfflineTransactions}
               className="sync-button"
               disabled={!networkStatus}
             >
@@ -692,246 +768,329 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
           )}
         </div>
       )}
-      
+
       {!networkStatus && (
         <div className="sync-indicator offline">
-          <span className="sync-icon">📶</span> 
+          <span className="sync-icon">📶</span>
           Modo offline. Os dados serão sincronizados quando você estiver online.
         </div>
       )}
-      
-      {/* Formulário de registro de transação */}
-      <section className="transaction-form">
-        <h2>Nova Transação</h2>
-        
-        <form onSubmit={handleSubmit}>
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="description">Descrição</label>
-              <input
-                type="text"
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Ex: Supermercado, Salário, etc."
-                required
-              />
-            </div>
-            
-            <div className="form-group">
-              <label htmlFor="amount">Valor (R$)</label>
-              <input
-                type="number"
-                id="amount"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0.00"
-                step="0.01"
-                min="0.01"
-                required
-              />
-            </div>
+
+      {activeScreen === "history" ? (
+        <div className="transaction-history-screen">
+          <div className="screen-header">
+            <button onClick={handleBackToRegister} className="back-button">
+              &larr; Voltar
+            </button>
+            <h2>Histórico de Transações</h2>
           </div>
-          
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="type">Tipo</label>
-              <select
-                id="type"
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-              >
-                <option value="expense">Despesa</option>
-                <option value="income">Receita</option>
-              </select>
-            </div>
-            
-            <div className="form-group">
-              <label htmlFor="category">Categoria</label>
-              <select
-                id="category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-              >
-                {type === 'expense' ? (
-                  expenseCategories.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                  ))
-                ) : (
-                  incomeCategories.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                  ))
-                )}
-              </select>
-            </div>
-            
-            <div className="form-group">
-              <label htmlFor="paymentMethod">Método de Pagamento</label>
-              <select
-                id="paymentMethod"
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
-              >
-                {paymentMethods.map(method => (
-                  <option key={method.id} value={method.id}>
-                    {method.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          
-          {type === 'expense' && (
-            <div className="form-row">
-              <div className="form-group checkbox-group">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={isRecurring}
-                    onChange={(e) => setIsRecurring(e.target.checked)}
-                  />
-                  Despesa parcelada
-                </label>
-              </div>
-              
-              {isRecurring && (
+
+          <TransactionsList
+            transactions={transactions}
+            onDelete={deleteTransaction}
+            categories={getAllCategories()}
+            paymentMethods={paymentMethods}
+          />
+        </div>
+      ) : (
+        <div className="register-screen">
+          {/* Formulário de registro de transação */}
+          <section className="transaction-form">
+            <h2>Nova Transação</h2>
+
+            <form onSubmit={handleSubmit} className="modern-form">
+              <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="installments">Número de parcelas</label>
+                  <label htmlFor="description">Descrição</label>
                   <input
-                    type="number"
-                    id="installments"
-                    value={installments}
-                    onChange={(e) => setInstallments(Math.max(2, parseInt(e.target.value) || 2))}
-                    min="2"
-                    max="72"
+                    type="text"
+                    id="description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Ex: Supermercado, Salário, etc."
+                    required
+                    className="modern-input"
                   />
                 </div>
+
+                <div className="form-group">
+                  <label htmlFor="amount">Valor (R$)</label>
+                  <input
+                    type="number"
+                    id="amount"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.00"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    className="modern-input"
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group radio-group">
+                  <label className="radio-label">Tipo</label>
+                  <div className="radio-options">
+                    <label
+                      className={`radio-option ${
+                        type === "expense" ? "selected" : ""
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="type"
+                        value="expense"
+                        checked={type === "expense"}
+                        onChange={() => setType("expense")}
+                      />
+                      <span className="radio-text">Despesa</span>
+                    </label>
+                    <label
+                      className={`radio-option ${
+                        type === "income" ? "selected" : ""
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="type"
+                        value="income"
+                        checked={type === "income"}
+                        onChange={() => setType("income")}
+                      />
+                      <span className="radio-text">Receita</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="category">Categoria</label>
+                  <select
+                    id="category"
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="modern-select"
+                  >
+                    {type === "expense"
+                      ? expenseCategories.map((cat) => (
+                          <option key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </option>
+                        ))
+                      : incomeCategories.map((cat) => (
+                          <option key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </option>
+                        ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="paymentMethod">Método de Pagamento</label>
+                  <select
+                    id="paymentMethod"
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="modern-select"
+                  >
+                    {paymentMethods.map((method) => (
+                      <option key={method.id} value={method.id}>
+                        {method.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {type === "expense" && (
+                <div className="form-row">
+                  <div className="form-group checkbox-group">
+                    <label className="switch-container">
+                      <input
+                        type="checkbox"
+                        checked={isRecurring}
+                        onChange={(e) => setIsRecurring(e.target.checked)}
+                      />
+                      <span className="switch-slider"></span>
+                      <span className="switch-label">Despesa parcelada</span>
+                    </label>
+                  </div>
+
+                  {isRecurring && (
+                    <div className="form-group">
+                      <label htmlFor="installments">Número de parcelas</label>
+                      <input
+                        type="number"
+                        id="installments"
+                        value={installments}
+                        onChange={(e) =>
+                          setInstallments(
+                            Math.max(2, parseInt(e.target.value) || 2)
+                          )
+                        }
+                        min="2"
+                        max="72"
+                        className="modern-input"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="form-row">
+                <TagSelector
+                  userId={userId}
+                  selectedTags={selectedTags}
+                  setSelectedTags={setSelectedTags}
+                />
+              </div>
+
+              <button type="submit" className="submit-button">
+                Adicionar Transação
+              </button>
+            </form>
+          </section>
+
+          {/* Lista de transações recentes */}
+          <section className="transactions-list">
+            <div className="section-header">
+              <h2>Transações Recentes</h2>
+              {transactions.length > 10 && (
+                <button
+                  onClick={() => setActiveScreen("history")}
+                  className="view-all-button"
+                >
+                  Ver todas as transações
+                </button>
               )}
             </div>
-          )}
-          
-          <div className="form-row">
-            <TagSelector 
-              userId={userId}
-              selectedTags={selectedTags}
-              setSelectedTags={setSelectedTags}
-            />
-          </div>
-          
-          <button type="submit" className="submit-button">
-            Adicionar Transação
-          </button>
-        </form>
-      </section>
-      
-      {/* Lista de transações recentes */}
-      <section className="transactions-list">
-        <h2>Transações Recentes</h2>
-        
-        {loading ? (
-          <div className="loading">Carregando transações...</div>
-        ) : transactions.length === 0 ? (
-          <div className="empty-state">
-            <p>Nenhuma transação registrada ainda.</p>
-            <p>Adicione sua primeira transação usando o formulário acima.</p>
-          </div>
-        ) : (
-          <table className="transactions-table">
-            <thead>
-              <tr>
-                <th>Data</th>
-                <th>Descrição</th>
-                <th>Categoria</th>
-                <th>Método de Pagamento</th>
-                <th>Tags</th>
-                <th>Valor</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {transactions.slice(0, 10).map(transaction => {
-                const isOffline = transaction.id.toString().startsWith('local_');
-                
-                return (
-                  <tr key={transaction.id} className={isOffline ? 'offline-transaction' : ''}>
-                    <td>{formatDate(transaction.date)}</td>
-                    <td>{transaction.description}</td>
-                    <td>{getCategoryName(transaction.category)}</td>
-                    <td>{transaction.paymentMethod ? getPaymentMethodName(transaction.paymentMethod) : 'Não especificado'}</td>
-                    <td className="transaction-tags">
-                      {transaction.tags && transaction.tags.map(tag => (
-                        <span 
-                          key={tag.id} 
-                          className="tag-pill" 
-                          style={{ backgroundColor: tag.color }}
+
+            {loading ? (
+              <div className="loading">Carregando transações...</div>
+            ) : transactions.length === 0 ? (
+              <div className="empty-state">
+                <p>Nenhuma transação registrada ainda.</p>
+                <p>
+                  Adicione sua primeira transação usando o formulário acima.
+                </p>
+              </div>
+            ) : (
+              <div className="table-container">
+                <table className="transactions-table">
+                  <thead>
+                    <tr>
+                      <th>Data</th>
+                      <th>Descrição</th>
+                      <th>Categoria</th>
+                      <th>Método</th>
+                      <th>Tags</th>
+                      <th>Valor</th>
+                      <th>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transactions.slice(0, 10).map((transaction) => {
+                      const isOffline = transaction.id
+                        .toString()
+                        .startsWith("local_");
+
+                      return (
+                        <tr
+                          key={transaction.id}
+                          className={isOffline ? "offline-transaction" : ""}
                         >
-                          {tag.name}
-                        </span>
-                      ))}
-                    </td>
-                    <td className={transaction.amount >= 0 ? 'positive' : 'negative'}>
-                      {new Intl.NumberFormat('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL'
-                      }).format(transaction.amount)}
-                    </td>
-                    <td>
-                      <button
-                        className="delete-button"
-                        onClick={() => deleteTransaction(transaction.id, transaction.groupId)}
-                        title="Excluir transação"
-                      >
-                        ×
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-        
-        {transactions.length > 10 && (
-          <div className="view-more">
-            <button onClick={() => setActiveScreen('history')}>
-              Ver todas as transações
-            </button>
-          </div>
-        )}
-      </section>
-      
-      {/* Resumo financeiro */}
-      <section className="financial-summary">
-        <div className="summary-card">
-          <h3>Saldo</h3>
-          <div className={`amount ${calculateBalance() >= 0 ? 'positive' : 'negative'}`}>
-            {new Intl.NumberFormat('pt-BR', {
-              style: 'currency',
-              currency: 'BRL'
-            }).format(calculateBalance())}
-          </div>
+                          <td>{formatDate(transaction.date)}</td>
+                          <td>{transaction.description}</td>
+                          <td>{getCategoryName(transaction.category)}</td>
+                          <td>
+                            {transaction.paymentMethod
+                              ? getPaymentMethodName(transaction.paymentMethod)
+                              : "Não especificado"}
+                          </td>
+                          <td className="transaction-tags">
+                            {transaction.tags &&
+                              transaction.tags.map((tag) => (
+                                <span
+                                  key={tag.id}
+                                  className="tag-pill"
+                                  style={{ backgroundColor: tag.color }}
+                                >
+                                  {tag.name}
+                                </span>
+                              ))}
+                          </td>
+                          <td
+                            className={
+                              transaction.amount >= 0 ? "positive" : "negative"
+                            }
+                          >
+                            {new Intl.NumberFormat("pt-BR", {
+                              style: "currency",
+                              currency: "BRL",
+                            }).format(transaction.amount)}
+                          </td>
+                          <td>
+                            <button
+                              className="delete-button"
+                              onClick={() =>
+                                deleteTransaction(
+                                  transaction.id,
+                                  transaction.groupId
+                                )
+                              }
+                              title="Excluir transação"
+                            >
+                              ×
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          {/* Resumo financeiro */}
+          <section className="financial-summary">
+            <div className="summary-card">
+              <h3>Saldo</h3>
+              <div
+                className={`amount ${
+                  calculateBalance() >= 0 ? "positive" : "negative"
+                }`}
+              >
+                {new Intl.NumberFormat("pt-BR", {
+                  style: "currency",
+                  currency: "BRL",
+                }).format(calculateBalance())}
+              </div>
+            </div>
+
+            <div className="summary-card">
+              <h3>Receitas</h3>
+              <div className="amount positive">
+                {new Intl.NumberFormat("pt-BR", {
+                  style: "currency",
+                  currency: "BRL",
+                }).format(calculateIncome())}
+              </div>
+            </div>
+
+            <div className="summary-card">
+              <h3>Despesas</h3>
+              <div className="amount negative">
+                {new Intl.NumberFormat("pt-BR", {
+                  style: "currency",
+                  currency: "BRL",
+                }).format(Math.abs(calculateExpenses()))}
+              </div>
+            </div>
+          </section>
         </div>
-        
-        <div className="summary-card">
-          <h3>Receitas</h3>
-          <div className="amount positive">
-            {new Intl.NumberFormat('pt-BR', {
-              style: 'currency',
-              currency: 'BRL'
-            }).format(calculateIncome())}
-          </div>
-        </div>
-        
-        <div className="summary-card">
-          <h3>Despesas</h3>
-          <div className="amount negative">
-            {new Intl.NumberFormat('pt-BR', {
-              style: 'currency',
-              currency: 'BRL'
-            }).format(Math.abs(calculateExpenses()))}
-          </div>
-        </div>
-      </section>
+      )}
     </div>
   );
 }
