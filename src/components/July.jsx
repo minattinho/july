@@ -20,6 +20,38 @@ import { checkSpendingLimit, checkGoalDeadlines, checkRecurringTransactions } fr
 import './July.css';
 import './TagSelector.css';
 
+// Utilitário para garantir que temos uma data válida
+const ensureValidDate = (date) => {
+  try {
+    if (!date) return new Date();
+    
+    if (date instanceof Date) {
+      return isNaN(date.getTime()) ? new Date() : date;
+    }
+    
+    if (typeof date === 'string') {
+      const parsedDate = new Date(date);
+      return isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+    }
+    
+    if (date && typeof date === 'object' && date.toDate) {
+      try {
+        const firestoreDate = date.toDate();
+        return isNaN(firestoreDate.getTime()) ? new Date() : firestoreDate;
+      } catch (e) {
+        console.error('Erro ao converter timestamp do Firestore:', e);
+        return new Date();
+      }
+    }
+    
+    // Fallback para casos não tratados
+    return new Date();
+  } catch (e) {
+    console.error('Erro ao processar data:', e);
+    return new Date();
+  }
+};
+
 export default function FinanceOrganizer({ userId, onTransactionAdded }) {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -163,52 +195,25 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
         (snapshot) => {
           const fetchedTransactions = snapshot.docs.map(doc => {
             const data = doc.data();
-            let date;
             
-            // Tratamento melhorado das datas
-            try {
-              if (data.date instanceof Date) {
-                date = data.date.toISOString();
-              } else if (data.date && typeof data.date === 'string') {
-                // Verifica se a string da data é válida
-                const parsedDate = new Date(data.date);
-                if (!isNaN(parsedDate.getTime())) {
-                  date = parsedDate.toISOString();
-                } else {
-                  // Se não for válida, usar a data atual
-                  date = new Date().toISOString();
-                  console.warn(`Data inválida encontrada: ${data.date}, usando data atual como fallback`);
-                }
-              } else if (data.date && data.date.toDate) {
-                // Timestamp do Firestore
-                date = data.date.toDate().toISOString();
-              } else {
-                // Fallback para data atual
-                date = new Date().toISOString();
-                console.warn('Data ausente ou inválida, usando data atual como fallback');
-              }
-            } catch (error) {
-              // Em caso de erro, usa a data atual
-              console.error('Erro ao processar data:', error);
-              date = new Date().toISOString();
-            }
+            // Usar nossa função utilitária para garantir uma data válida
+            const validDate = ensureValidDate(data.date);
             
             return {
               id: doc.id,
               ...data,
-              date
+              date: validDate.toISOString(),
+              // Garantir que valores numéricos são realmente números
+              amount: parseFloat(data.amount) || 0
             };
           });
           
-          // Usa a ordenação segura com try-catch para evitar erros
+          // Ordenação segura
           try {
             fetchedTransactions.sort((a, b) => {
-              try {
-                return new Date(b.date).getTime() - new Date(a.date).getTime();
-              } catch (error) {
-                console.warn('Erro ao ordenar datas:', error);
-                return 0; // Mantém a ordem atual se houver erro
-              }
+              const dateA = ensureValidDate(a.date);
+              const dateB = ensureValidDate(b.date);
+              return dateB.getTime() - dateA.getTime();
             });
           } catch (error) {
             console.error('Erro durante a ordenação:', error);
@@ -292,7 +297,11 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
           date: installmentDate.toISOString(),
           isRecurring,
           groupId,
-          tags: selectedTags
+          tags: selectedTags.map(tag => ({
+            id: tag.id,
+            name: tag.name,
+            color: tag.color
+          }))
         };
         
         newTransactions.push(newTransaction);
@@ -373,9 +382,9 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
         type,
         category,
         paymentMethod,
-        date: now,
+        date: now.toISOString(),
         isInstallment: false,
-        createdAt: now,
+        createdAt: now.toISOString(),
         tags: selectedTags.map(tag => ({
           id: tag.id,
           name: tag.name,
@@ -598,7 +607,7 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
   const calculateBalance = () => {
     try {
       return transactions.reduce((acc, transaction) => {
-        const amount = Number(transaction.amount) || 0;
+        const amount = parseFloat(transaction.amount) || 0;
         return acc + amount;
       }, 0).toFixed(2);
     } catch (error) {
@@ -610,9 +619,9 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
   const calculateIncome = () => {
     try {
       return transactions
-        .filter(transaction => Number(transaction.amount) > 0)
+        .filter(transaction => parseFloat(transaction.amount) > 0)
         .reduce((acc, transaction) => {
-          const amount = Number(transaction.amount) || 0;
+          const amount = parseFloat(transaction.amount) || 0;
           return acc + amount;
         }, 0)
         .toFixed(2);
@@ -625,9 +634,9 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
   const calculateExpenses = () => {
     try {
       return transactions
-        .filter(transaction => Number(transaction.amount) < 0)
+        .filter(transaction => parseFloat(transaction.amount) < 0)
         .reduce((acc, transaction) => {
-          const amount = Number(transaction.amount) || 0;
+          const amount = parseFloat(transaction.amount) || 0;
           return acc + amount;
         }, 0)
         .toFixed(2);
@@ -639,13 +648,8 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
   
   const formatDate = (dateString) => {
     try {
-      if (!dateString) return 'Data desconhecida';
-      const date = new Date(dateString);
-      // Verifica se a data é válida
-      if (isNaN(date.getTime())) {
-        return 'Data inválida';
-      }
-      return date.toLocaleDateString();
+      const validDate = ensureValidDate(dateString);
+      return validDate.toLocaleDateString();
     } catch (error) {
       console.error('Erro ao formatar data:', error, dateString);
       return 'Data inválida';
