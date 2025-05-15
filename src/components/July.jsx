@@ -152,26 +152,36 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
     
     setLoading(true);
     
-    // Create query for user's transactions
     const transactionsRef = collection(db, 'transactions');
     const q = query(
       transactionsRef,
       where('userId', '==', userId)
     );
     
-    // Set up real-time listener
     try {
       const unsubscribe = onSnapshot(q, 
         (snapshot) => {
-          const fetchedTransactions = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            date: doc.data().date instanceof Date ? 
-              doc.data().date.toISOString() : 
-              doc.data().date
-          }));
+          const fetchedTransactions = snapshot.docs.map(doc => {
+            const data = doc.data();
+            let date;
+            
+            if (data.date instanceof Date) {
+              date = data.date.toISOString();
+            } else if (data.date && typeof data.date === 'string') {
+              date = data.date;
+            } else if (data.date && data.date.toDate) {
+              date = data.date.toDate().toISOString();
+            } else {
+              date = new Date().toISOString();
+            }
+            
+            return {
+              id: doc.id,
+              ...data,
+              date
+            };
+          });
           
-          // Ordenar por data (mais recentes primeiro)
           fetchedTransactions.sort((a, b) => 
             new Date(b.date) - new Date(a.date)
           );
@@ -185,7 +195,6 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
           setLoading(false);
           setSyncStatus('error');
           
-          // If error, try to load from localStorage as fallback
           const cachedTransactions = localStorage.getItem('cachedTransactions');
           if (cachedTransactions) {
             setTransactions(JSON.parse(cachedTransactions));
@@ -193,7 +202,6 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
         }
       );
       
-      // Cleanup listener
       return () => unsubscribe();
     } catch (error) {
       console.error('Erro ao configurar listener de transações:', error);
@@ -227,17 +235,14 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
     
     const baseAmount = Number(amount);
     const now = new Date();
+    const transactionDate = now.toISOString();
     
     // Handle installments
     if (isRecurring && type === 'expense' && installments > 1) {
-      // Calculate installment amount
       const installmentAmount = baseAmount / installments;
       const groupId = Date.now().toString();
-      
-      // Create an array for batch transactions
       const newTransactions = [];
       
-      // Create a transaction for each installment
       for (let i = 0; i < installments; i++) {
         const installmentDate = new Date();
         installmentDate.setMonth(now.getMonth() + i);
@@ -249,18 +254,10 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
           type,
           category,
           paymentMethod,
-          date: installmentDate,
-          isInstallment: true,
-          installmentNumber: i + 1,
-          totalInstallments: installments,
-          originalAmount: baseAmount,
+          date: installmentDate.toISOString(),
+          isRecurring,
           groupId,
-          createdAt: now,
-          tags: selectedTags.map(tag => ({
-            id: tag.id,
-            name: tag.name,
-            color: tag.color
-          }))
+          tags: selectedTags
         };
         
         newTransactions.push(newTransaction);

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import FinanceOrganizer from './components/FinanceOrganizer';
+import July from './components/July';
 import Dashboard from './components/Dashboard';
 import Goals from './components/Goals';
 import Reports from './components/Reports';
@@ -104,7 +104,7 @@ function App() {
       <header className="app-header">
         <div className="container">
           <div className="app-logo">
-            <h1>Organizador Financeiro</h1>
+            <h1>July</h1>
           </div>
           <div className="user-info">
             <span>Olá, {user.email}</span>
@@ -162,7 +162,7 @@ function App() {
               )}
               
               {activeTab === 'register' && (
-                <FinanceOrganizer 
+                <July 
                   userId={user.uid}
                   onTransactionAdded={(newTransaction) => {
                     // Atualizar o estado de transações quando uma nova for adicionada
@@ -189,7 +189,7 @@ function App() {
 
       <footer className="app-footer">
         <div className="container">
-          <p>Organizador Financeiro © {new Date().getFullYear()}</p>
+          <p>July © {new Date().getFullYear()}</p>
         </div>
       </footer>
     </div>
