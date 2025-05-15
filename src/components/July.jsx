@@ -165,13 +165,31 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
             const data = doc.data();
             let date;
             
-            if (data.date instanceof Date) {
-              date = data.date.toISOString();
-            } else if (data.date && typeof data.date === 'string') {
-              date = data.date;
-            } else if (data.date && data.date.toDate) {
-              date = data.date.toDate().toISOString();
-            } else {
+            // Tratamento melhorado das datas
+            try {
+              if (data.date instanceof Date) {
+                date = data.date.toISOString();
+              } else if (data.date && typeof data.date === 'string') {
+                // Verifica se a string da data é válida
+                const parsedDate = new Date(data.date);
+                if (!isNaN(parsedDate.getTime())) {
+                  date = parsedDate.toISOString();
+                } else {
+                  // Se não for válida, usar a data atual
+                  date = new Date().toISOString();
+                  console.warn(`Data inválida encontrada: ${data.date}, usando data atual como fallback`);
+                }
+              } else if (data.date && data.date.toDate) {
+                // Timestamp do Firestore
+                date = data.date.toDate().toISOString();
+              } else {
+                // Fallback para data atual
+                date = new Date().toISOString();
+                console.warn('Data ausente ou inválida, usando data atual como fallback');
+              }
+            } catch (error) {
+              // Em caso de erro, usa a data atual
+              console.error('Erro ao processar data:', error);
               date = new Date().toISOString();
             }
             
@@ -182,9 +200,19 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
             };
           });
           
-          fetchedTransactions.sort((a, b) => 
-            new Date(b.date) - new Date(a.date)
-          );
+          // Usa a ordenação segura com try-catch para evitar erros
+          try {
+            fetchedTransactions.sort((a, b) => {
+              try {
+                return new Date(b.date).getTime() - new Date(a.date).getTime();
+              } catch (error) {
+                console.warn('Erro ao ordenar datas:', error);
+                return 0; // Mantém a ordem atual se houver erro
+              }
+            });
+          } catch (error) {
+            console.error('Erro durante a ordenação:', error);
+          }
           
           setTransactions(fetchedTransactions);
           setLoading(false);
@@ -233,7 +261,14 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
     e.preventDefault();
     if (!description || !amount) return;
     
-    const baseAmount = Number(amount);
+    // Garantir que o valor é um número válido
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount)) {
+      alert('Por favor, insira um valor válido.');
+      return;
+    }
+    
+    const baseAmount = parsedAmount;
     const now = new Date();
     const transactionDate = now.toISOString();
     
@@ -561,26 +596,60 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
   
   // Funções de cálculo e formatação
   const calculateBalance = () => {
-    return transactions.reduce((acc, transaction) => acc + Number(transaction.amount), 0).toFixed(2);
+    try {
+      return transactions.reduce((acc, transaction) => {
+        const amount = Number(transaction.amount) || 0;
+        return acc + amount;
+      }, 0).toFixed(2);
+    } catch (error) {
+      console.error('Erro ao calcular saldo:', error);
+      return '0.00';
+    }
   };
   
   const calculateIncome = () => {
-    return transactions
-      .filter(transaction => transaction.amount > 0)
-      .reduce((acc, transaction) => acc + Number(transaction.amount), 0)
-      .toFixed(2);
+    try {
+      return transactions
+        .filter(transaction => Number(transaction.amount) > 0)
+        .reduce((acc, transaction) => {
+          const amount = Number(transaction.amount) || 0;
+          return acc + amount;
+        }, 0)
+        .toFixed(2);
+    } catch (error) {
+      console.error('Erro ao calcular receitas:', error);
+      return '0.00';
+    }
   };
   
   const calculateExpenses = () => {
-    return transactions
-      .filter(transaction => transaction.amount < 0)
-      .reduce((acc, transaction) => acc + Number(transaction.amount), 0)
-      .toFixed(2);
+    try {
+      return transactions
+        .filter(transaction => Number(transaction.amount) < 0)
+        .reduce((acc, transaction) => {
+          const amount = Number(transaction.amount) || 0;
+          return acc + amount;
+        }, 0)
+        .toFixed(2);
+    } catch (error) {
+      console.error('Erro ao calcular despesas:', error);
+      return '0.00';
+    }
   };
   
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString();
+    try {
+      if (!dateString) return 'Data desconhecida';
+      const date = new Date(dateString);
+      // Verifica se a data é válida
+      if (isNaN(date.getTime())) {
+        return 'Data inválida';
+      }
+      return date.toLocaleDateString();
+    } catch (error) {
+      console.error('Erro ao formatar data:', error, dateString);
+      return 'Data inválida';
+    }
   };
   
   const getCategoryName = (categoryId) => {
