@@ -57,6 +57,76 @@ const ensureValidDate = (date) => {
   }
 };
 
+// Função para analisar arquivo CSV
+const parseCSV = (content) => {
+  const lines = content.split("\n");
+  const headers = lines[0].split(",").map((header) => header.trim());
+
+  const transactions = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+
+    const values = lines[i].split(",").map((value) => value.trim());
+    const transaction = {};
+
+    headers.forEach((header, index) => {
+      transaction[header] = values[index];
+    });
+
+    transactions.push(transaction);
+  }
+
+  return transactions;
+};
+
+// Função para analisar arquivo OFX
+const parseOFX = (content) => {
+  const transactions = [];
+
+  // Extrair transações do conteúdo OFX
+  const stmtTrns = content.match(/<STMTTRN>[\s\S]*?<\/STMTTRN>/g) || [];
+
+  stmtTrns.forEach((trnStr) => {
+    const transaction = {};
+
+    // Extrair data da transação (formato: YYYYMMDD)
+    const dateMatch = trnStr.match(/<DTPOSTED>(.*?)<\/DTPOSTED>/);
+    if (dateMatch && dateMatch[1]) {
+      const dateStr = dateMatch[1];
+      // Converter formato YYYYMMDD para YYYY-MM-DD
+      if (dateStr.length >= 8) {
+        const year = dateStr.substring(0, 4);
+        const month = dateStr.substring(4, 6);
+        const day = dateStr.substring(6, 8);
+        transaction.date = `${year}-${month}-${day}`;
+      }
+    }
+
+    // Extrair valor da transação
+    const amountMatch = trnStr.match(/<TRNAMT>(.*?)<\/TRNAMT>/);
+    if (amountMatch && amountMatch[1]) {
+      transaction.amount = parseFloat(amountMatch[1]);
+    }
+
+    // Extrair descrição da transação
+    const memoMatch = trnStr.match(/<MEMO>(.*?)<\/MEMO>/);
+    if (memoMatch && memoMatch[1]) {
+      transaction.description = memoMatch[1];
+    }
+
+    // Extrair ID da transação
+    const idMatch = trnStr.match(/<FITID>(.*?)<\/FITID>/);
+    if (idMatch && idMatch[1]) {
+      transaction.id = idMatch[1];
+    }
+
+    transactions.push(transaction);
+  });
+
+  return transactions;
+};
+
 export default function FinanceOrganizer({
   userId,
   onTransactionAdded,
@@ -81,6 +151,9 @@ export default function FinanceOrganizer({
   const [offlineTransactions, setOfflineTransactions] = useState([]);
   const [selectedTags, setSelectedTags] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false); // Variável para controlar a submissão
+  const [importedTransactions, setImportedTransactions] = useState([]);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importStatus, setImportStatus] = useState(""); // idle, processing, success, error
 
   // Categorias separadas para despesas e receitas
   const expenseCategories = [
@@ -789,6 +862,126 @@ export default function FinanceOrganizer({
     }
   };
 
+  // Função para importar arquivo
+  const handleFileImport = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setImportStatus("processing");
+
+    try {
+      const reader = new FileReader();
+
+      reader.onload = async (event) => {
+        const content = event.target.result;
+        let parsedTransactions = [];
+
+        // Determinar o tipo de arquivo pelo nome ou extensão
+        if (file.name.toLowerCase().endsWith(".csv")) {
+          parsedTransactions = parseCSV(content);
+        } else if (file.name.toLowerCase().endsWith(".ofx")) {
+          parsedTransactions = parseOFX(content);
+        } else {
+          throw new Error("Formato de arquivo não suportado. Use CSV ou OFX.");
+        }
+
+        // Mapear as transações para o formato da aplicação
+        const mappedTransactions = parsedTransactions
+          .map((transaction) => {
+            const isNegative =
+              transaction.amount < 0 ||
+              (transaction.amount &&
+                transaction.amount.toString().startsWith("-")) ||
+              (transaction.type &&
+                transaction.type.toLowerCase().includes("debit"));
+
+            return {
+              description:
+                transaction.description ||
+                transaction.memo ||
+                transaction.MEMO ||
+                "Importado",
+              amount: Math.abs(parseFloat(transaction.amount || "0")),
+              type: isNegative ? "expense" : "income",
+              category: isNegative ? "general_expense" : "general_income",
+              paymentMethod: "bank_transfer", // Padrão para extratos bancários
+              date: transaction.date || new Date().toISOString().split("T")[0],
+              importedFrom: file.name,
+            };
+          })
+          .filter((t) => t.amount > 0); // Remover transações sem valor
+
+        setImportedTransactions(mappedTransactions);
+        setImportStatus("success");
+        setShowImportModal(true);
+      };
+
+      reader.onerror = () => {
+        throw new Error("Erro ao ler o arquivo.");
+      };
+
+      // Ler o arquivo como texto
+      if (file.name.toLowerCase().endsWith(".csv")) {
+        reader.readAsText(file);
+      } else {
+        reader.readAsText(file);
+      }
+    } catch (error) {
+      console.error("Erro ao importar arquivo:", error);
+      setImportStatus("error");
+      alert(`Erro ao importar: ${error.message}`);
+    }
+  };
+
+  // Função para confirmar a importação de transações
+  const confirmImport = async () => {
+    if (!importedTransactions.length) return;
+
+    setIsSubmitting(true);
+    setSyncStatus("syncing");
+
+    try {
+      // Use batch para melhor performance
+      const batch = writeBatch(db);
+
+      importedTransactions.forEach((transaction) => {
+        const newDocRef = doc(collection(db, "transactions"));
+        batch.set(newDocRef, {
+          userId,
+          description: transaction.description,
+          amount:
+            transaction.type === "expense"
+              ? -Math.abs(transaction.amount)
+              : Math.abs(transaction.amount),
+          type: transaction.type,
+          category: transaction.category,
+          paymentMethod: transaction.paymentMethod,
+          date: transaction.date,
+          isInstallment: false,
+          createdAt: new Date().toISOString(),
+          tags: [],
+          importedFrom: transaction.importedFrom || "manual",
+        });
+      });
+
+      await batch.commit();
+
+      setShowImportModal(false);
+      setImportedTransactions([]);
+      setImportStatus("idle");
+      setSyncStatus("synced");
+      alert(
+        `${importedTransactions.length} transações importadas com sucesso!`
+      );
+    } catch (error) {
+      console.error("Erro ao importar transações:", error);
+      setSyncStatus("error");
+      alert(`Erro ao importar transações: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // Renderização do componente
   return (
     <div className="finance-app">
@@ -843,6 +1036,31 @@ export default function FinanceOrganizer({
           {/* Formulário de registro de transação */}
           <section className="transaction-form">
             <h2>Nova Transação</h2>
+
+            {/* Área de importação de arquivos */}
+            <div className="import-area">
+              <h3>Importar Extrato Bancário</h3>
+              <p className="import-description">
+                Importe transações de arquivos CSV ou OFX do seu banco.
+              </p>
+              <div className="file-upload-container">
+                <label className="file-upload-button">
+                  <input
+                    type="file"
+                    accept=".csv,.ofx"
+                    onChange={handleFileImport}
+                    disabled={isSubmitting}
+                  />
+                  Selecionar arquivo
+                </label>
+                <span className="file-format-info">
+                  Formatos aceitos: CSV, OFX
+                </span>
+              </div>
+              {importStatus === "processing" && (
+                <p className="import-status">Processando arquivo...</p>
+              )}
+            </div>
 
             <form onSubmit={handleSubmit} className="modern-form">
               <div className="form-row">
@@ -1150,6 +1368,83 @@ export default function FinanceOrganizer({
               </div>
             </div>
           </section>
+        </div>
+      )}
+
+      {/* Modal para confirmar importação */}
+      {showImportModal && (
+        <div className="import-modal-overlay">
+          <div className="import-modal">
+            <div className="import-modal-header">
+              <h3>Confirmar Importação</h3>
+              <button
+                className="close-modal-button"
+                onClick={() => setShowImportModal(false)}
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="import-modal-content">
+              <p>
+                Foram encontradas {importedTransactions.length} transações.
+                Deseja importar?
+              </p>
+
+              <div className="import-transactions-preview">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Data</th>
+                      <th>Descrição</th>
+                      <th>Valor</th>
+                      <th>Tipo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {importedTransactions
+                      .slice(0, 10)
+                      .map((transaction, index) => (
+                        <tr key={index}>
+                          <td>{transaction.date}</td>
+                          <td>{transaction.description}</td>
+                          <td>R$ {transaction.amount.toFixed(2)}</td>
+                          <td>
+                            {transaction.type === "income"
+                              ? "Receita"
+                              : "Despesa"}
+                          </td>
+                        </tr>
+                      ))}
+                    {importedTransactions.length > 10 && (
+                      <tr>
+                        <td colSpan="4" className="more-transactions">
+                          E mais {importedTransactions.length - 10}{" "}
+                          transações...
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="import-modal-actions">
+              <button
+                className="secondary-button"
+                onClick={() => setShowImportModal(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                className="primary-button"
+                onClick={confirmImport}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Importando..." : "Confirmar Importação"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

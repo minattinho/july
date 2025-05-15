@@ -795,3 +795,211 @@ input:checked + .switch-slider:before {
   font-size: 1.25rem;
   color: #2d3748;
 }
+
+.import-area {
+  background-color: var(--background-secondary);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.import-area h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: var(--text-primary);
+  font-size: 1.1rem;
+}
+
+.import-description {
+  margin-bottom: 15px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.file-upload-container {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.file-upload-button {
+  background-color: var(--primary);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  font-size: 0.9rem;
+  display: inline-block;
+}
+
+.file-upload-button:hover {
+  background-color: var(--primary-dark);
+}
+
+.file-upload-button input[type="file"] {
+  display: none;
+}
+
+.file-format-info {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.import-status {
+  margin-top: 10px;
+  color: var(--primary);
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+/* Modal de Importação */
+.import-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.import-modal {
+  background-color: var(--background-primary);
+  border-radius: 10px;
+  width: 90%;
+  max-width: 800px;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.import-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.import-modal-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.close-modal-button {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+
+.close-modal-button:hover {
+  background-color: var(--background-hover);
+}
+
+.import-modal-content {
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.import-transactions-preview {
+  margin-top: 15px;
+  max-height: 400px;
+  overflow-y: auto;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+
+.import-transactions-preview table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.import-transactions-preview th,
+.import-transactions-preview td {
+  padding: 10px 15px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.import-transactions-preview th {
+  background-color: var(--background-secondary);
+  color: var(--text-primary);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.import-transactions-preview tr:last-child td {
+  border-bottom: none;
+}
+
+.import-transactions-preview tr:nth-child(even) {
+  background-color: var(--background-secondary-light);
+}
+
+.import-transactions-preview .more-transactions {
+  text-align: center;
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.import-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-color);
+  background-color: var(--background-secondary);
+}
+
+.import-modal-actions button {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: all 0.3s;
+}
+
+.import-modal-actions .secondary-button {
+  background-color: var(--background-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.import-modal-actions .secondary-button:hover {
+  background-color: var(--background-hover);
+}
+
+.import-modal-actions .primary-button {
+  background-color: var(--primary);
+  color: white;
+}
+
+.import-modal-actions .primary-button:hover {
+  background-color: var(--primary-dark);
+}
+
+.import-modal-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
