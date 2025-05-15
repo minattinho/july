@@ -17,7 +17,7 @@ import {
 } from 'firebase/firestore';
 import { TagSelector } from './FinanceOrganizerExtended';
 import { checkSpendingLimit, checkGoalDeadlines, checkRecurringTransactions } from '../utils/notificationSystem';
-import './FinanceOrganizer.css';
+import './July.css';
 import './TagSelector.css';
 
 export default function FinanceOrganizer({ userId, onTransactionAdded }) {
