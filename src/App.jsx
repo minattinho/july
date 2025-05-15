@@ -205,6 +205,7 @@ function App() {
               {activeTab === "register" && (
                 <July
                   userId={user.uid}
+                  transactions={transactions}
                   onTransactionAdded={() => {
                     // A atualização do estado é feita automaticamente pelo listener do Firestore
                     // Não precisamos adicionar manualmente para evitar duplicação

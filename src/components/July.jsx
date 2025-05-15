@@ -57,9 +57,13 @@ const ensureValidDate = (date) => {
   }
 };
 
-export default function FinanceOrganizer({ userId, onTransactionAdded }) {
-  const [transactions, setTransactions] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function FinanceOrganizer({
+  userId,
+  onTransactionAdded,
+  transactions: appTransactions,
+}) {
+  // Removendo o estado local de transações e usando as transações do App
+  const [loading, setLoading] = useState(false);
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [type, setType] = useState("expense");
@@ -76,6 +80,7 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
   const [networkStatus, setNetworkStatus] = useState(navigator.onLine);
   const [offlineTransactions, setOfflineTransactions] = useState([]);
   const [selectedTags, setSelectedTags] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false); // Variável para controlar a submissão
 
   // Categorias separadas para despesas e receitas
   const expenseCategories = [
@@ -195,69 +200,24 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
 
     setLoading(true);
 
-    const transactionsRef = collection(db, "transactions");
-    const q = query(transactionsRef, where("userId", "==", userId));
+    // Estamos removendo o listener de transações aqui porque o App.jsx já possui um
+    // listener que está atualizando o estado global de transações
 
-    try {
-      const unsubscribe = onSnapshot(
-        q,
-        (snapshot) => {
-          const fetchedTransactions = snapshot.docs.map((doc) => {
-            const data = doc.data();
+    // Apenas indicamos que não estamos mais carregando
+    setLoading(false);
 
-            // Usar nossa função utilitária para garantir uma data válida
-            const validDate = ensureValidDate(data.date);
-
-            return {
-              id: doc.id,
-              ...data,
-              date: validDate.toISOString(),
-              // Garantir que valores numéricos são realmente números
-              amount: parseFloat(data.amount) || 0,
-            };
-          });
-
-          // Ordenação segura
-          try {
-            fetchedTransactions.sort((a, b) => {
-              const dateA = ensureValidDate(a.date);
-              const dateB = ensureValidDate(b.date);
-              return dateB.getTime() - dateA.getTime();
-            });
-          } catch (error) {
-            console.error("Erro durante a ordenação:", error);
-          }
-
-          setTransactions(fetchedTransactions);
-          setLoading(false);
-          setSyncStatus("synced");
-        },
-        (error) => {
-          console.error("Erro ao buscar transações:", error);
-          setLoading(false);
-          setSyncStatus("error");
-
-          const cachedTransactions = localStorage.getItem("cachedTransactions");
-          if (cachedTransactions) {
-            setTransactions(JSON.parse(cachedTransactions));
-          }
-        }
-      );
-
-      return () => unsubscribe();
-    } catch (error) {
-      console.error("Erro ao configurar listener de transações:", error);
-      setLoading(false);
-      setSyncStatus("error");
-    }
+    // Não é mais necessário retornar uma função de limpeza
   }, [userId]);
 
   // Cache transactions in localStorage for offline access
   useEffect(() => {
-    if (transactions.length > 0) {
-      localStorage.setItem("cachedTransactions", JSON.stringify(transactions));
+    if (appTransactions.length > 0) {
+      localStorage.setItem(
+        "cachedTransactions",
+        JSON.stringify(appTransactions)
+      );
     }
-  }, [transactions]);
+  }, [appTransactions]);
 
   // Efeito para atualizar a categoria quando o tipo mudar
   useEffect(() => {
@@ -275,81 +235,110 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
     e.preventDefault();
     if (!description || !amount) return;
 
-    // Garantir que o valor é um número válido
-    const parsedAmount = parseFloat(amount);
-    if (isNaN(parsedAmount)) {
-      alert("Por favor, insira um valor válido.");
-      return;
-    }
+    // Prevenir envios duplicados
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
-    const baseAmount = parsedAmount;
-    const selectedDate = new Date(transactionDate);
-    const transactionDateTime = selectedDate.toISOString();
-
-    // Handle installments
-    if (isRecurring && type === "expense" && installments > 1) {
-      const installmentAmount = baseAmount / installments;
-      const groupId = Date.now().toString();
-      const newTransactions = [];
-
-      for (let i = 0; i < installments; i++) {
-        const installmentDate = new Date(selectedDate);
-        installmentDate.setMonth(selectedDate.getMonth() + i);
-
-        const newTransaction = {
-          userId,
-          description: `${description} (${i + 1}/${installments})`,
-          amount: -installmentAmount,
-          type,
-          category,
-          paymentMethod,
-          date: installmentDate.toISOString(),
-          isRecurring,
-          groupId,
-          tags: selectedTags.map((tag) => ({
-            id: tag.id,
-            name: tag.name,
-            color: tag.color,
-          })),
-        };
-
-        newTransactions.push(newTransaction);
+    try {
+      // Garantir que o valor é um número válido
+      const parsedAmount = parseFloat(amount);
+      if (isNaN(parsedAmount)) {
+        alert("Por favor, insira um valor válido.");
+        return;
       }
 
-      if (networkStatus) {
-        try {
-          setSyncStatus("syncing");
+      const baseAmount = parsedAmount;
+      const selectedDate = new Date(transactionDate);
+      const transactionDateTime = selectedDate.toISOString();
 
-          // Use batch for better performance
-          const batch = writeBatch(db);
+      // Handle installments
+      if (isRecurring && type === "expense" && installments > 1) {
+        const installmentAmount = baseAmount / installments;
+        const groupId = Date.now().toString();
+        const newTransactions = [];
 
-          newTransactions.forEach((transaction) => {
-            const newDocRef = doc(collection(db, "transactions"));
-            batch.set(newDocRef, transaction);
-          });
+        for (let i = 0; i < installments; i++) {
+          const installmentDate = new Date(selectedDate);
+          installmentDate.setMonth(selectedDate.getMonth() + i);
 
-          await batch.commit();
-
-          // Verificar a primeira parcela para notificações
-          const firstInstallment = {
-            id: newDocRef.id,
-            ...newTransactions[0],
+          const newTransaction = {
+            userId,
+            description: `${description} (${i + 1}/${installments})`,
+            amount: -installmentAmount,
+            type,
+            category,
+            paymentMethod,
+            date: installmentDate.toISOString(),
+            isRecurring,
+            groupId,
+            tags: selectedTags.map((tag) => ({
+              id: tag.id,
+              name: tag.name,
+              color: tag.color,
+            })),
           };
-          await checkSpendingLimit(userId, firstInstallment);
 
-          // Verificar transações recorrentes
-          await checkRecurringTransactions(userId);
+          newTransactions.push(newTransaction);
+        }
 
-          setSyncStatus("synced");
+        if (networkStatus) {
+          try {
+            setSyncStatus("syncing");
 
-          // Notificar o componente pai
-          if (onTransactionAdded) {
-            onTransactionAdded(newTransactions[0]);
+            // Use batch for better performance
+            const batch = writeBatch(db);
+
+            newTransactions.forEach((transaction) => {
+              const newDocRef = doc(collection(db, "transactions"));
+              batch.set(newDocRef, transaction);
+            });
+
+            await batch.commit();
+
+            // Verificar a primeira parcela para notificações
+            const firstInstallment = {
+              id: newDocRef.id,
+              ...newTransactions[0],
+            };
+            await checkSpendingLimit(userId, firstInstallment);
+
+            // Verificar transações recorrentes
+            await checkRecurringTransactions(userId);
+
+            setSyncStatus("synced");
+
+            // Notificar o componente pai
+            if (onTransactionAdded) {
+              newTransactions.forEach((transaction) => {
+                onTransactionAdded(transaction);
+              });
+            }
+          } catch (error) {
+            console.error("Erro ao adicionar transações:", error);
+            setSyncStatus("error");
+
+            // Store offline for later sync
+            const offlineTransactionsToAdd = newTransactions.map(
+              (transaction) => ({
+                ...transaction,
+                _operation: "add",
+                _localId: `local_${Date.now()}_${Math.random()
+                  .toString(36)
+                  .substr(2, 9)}`,
+              })
+            );
+
+            const updatedOfflineTransactions = [
+              ...offlineTransactions,
+              ...offlineTransactionsToAdd,
+            ];
+            setOfflineTransactions(updatedOfflineTransactions);
+            localStorage.setItem(
+              "offlineTransactions",
+              JSON.stringify(updatedOfflineTransactions)
+            );
           }
-        } catch (error) {
-          console.error("Erro ao adicionar transações:", error);
-          setSyncStatus("error");
-
+        } else {
           // Store offline for later sync
           const offlineTransactionsToAdd = newTransactions.map(
             (transaction) => ({
@@ -370,82 +359,94 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
             "offlineTransactions",
             JSON.stringify(updatedOfflineTransactions)
           );
+
+          // Update local transactions view
+          const localTransactionsView = offlineTransactionsToAdd.map((t) => ({
+            ...t,
+            id: t._localId,
+            date: t.date instanceof Date ? t.date.toISOString() : t.date,
+          }));
+
+          localTransactionsView.forEach((t) => {
+            updateLocalTransactionsView(t);
+          });
         }
       } else {
-        // Store offline for later sync
-        const offlineTransactionsToAdd = newTransactions.map((transaction) => ({
-          ...transaction,
-          _operation: "add",
-          _localId: `local_${Date.now()}_${Math.random()
-            .toString(36)
-            .substr(2, 9)}`,
-        }));
+        // Single transaction
+        const newTransaction = {
+          userId,
+          description,
+          amount:
+            type === "expense" ? -Math.abs(baseAmount) : Math.abs(baseAmount),
+          type,
+          category,
+          paymentMethod,
+          date: transactionDateTime,
+          isInstallment: false,
+          createdAt: new Date().toISOString(),
+          tags: selectedTags.map((tag) => ({
+            id: tag.id,
+            name: tag.name,
+            color: tag.color,
+          })),
+        };
 
-        const updatedOfflineTransactions = [
-          ...offlineTransactions,
-          ...offlineTransactionsToAdd,
-        ];
-        setOfflineTransactions(updatedOfflineTransactions);
-        localStorage.setItem(
-          "offlineTransactions",
-          JSON.stringify(updatedOfflineTransactions)
-        );
+        if (networkStatus) {
+          try {
+            setSyncStatus("syncing");
 
-        // Update local transactions view
-        const localTransactionsView = offlineTransactionsToAdd.map((t) => ({
-          ...t,
-          id: t._localId,
-          date: t.date instanceof Date ? t.date.toISOString() : t.date,
-        }));
+            const docRef = await addDoc(
+              collection(db, "transactions"),
+              newTransaction
+            );
+            const addedTransaction = {
+              id: docRef.id,
+              ...newTransaction,
+            };
 
-        setTransactions([...localTransactionsView, ...transactions]);
-      }
-    } else {
-      // Single transaction
-      const newTransaction = {
-        userId,
-        description,
-        amount:
-          type === "expense" ? -Math.abs(baseAmount) : Math.abs(baseAmount),
-        type,
-        category,
-        paymentMethod,
-        date: transactionDateTime,
-        isInstallment: false,
-        createdAt: new Date().toISOString(),
-        tags: selectedTags.map((tag) => ({
-          id: tag.id,
-          name: tag.name,
-          color: tag.color,
-        })),
-      };
+            // Verificar limite de gastos para notificações
+            await checkSpendingLimit(userId, addedTransaction);
 
-      if (networkStatus) {
-        try {
-          setSyncStatus("syncing");
+            setSyncStatus("synced");
 
-          const docRef = await addDoc(
-            collection(db, "transactions"),
-            newTransaction
-          );
-          const addedTransaction = {
-            id: docRef.id,
-            ...newTransaction,
-          };
+            // Notificar o componente pai
+            if (onTransactionAdded) {
+              onTransactionAdded(addedTransaction);
+            }
+          } catch (error) {
+            console.error("Erro ao adicionar transação:", error);
+            setSyncStatus("error");
 
-          // Verificar limite de gastos para notificações
-          await checkSpendingLimit(userId, addedTransaction);
+            // Store offline for later sync
+            const offlineTransaction = {
+              ...newTransaction,
+              _operation: "add",
+              _localId: `local_${Date.now()}_${Math.random()
+                .toString(36)
+                .substr(2, 9)}`,
+            };
 
-          setSyncStatus("synced");
+            const updatedOfflineTransactions = [
+              ...offlineTransactions,
+              offlineTransaction,
+            ];
+            setOfflineTransactions(updatedOfflineTransactions);
+            localStorage.setItem(
+              "offlineTransactions",
+              JSON.stringify(updatedOfflineTransactions)
+            );
 
-          // Notificar o componente pai
-          if (onTransactionAdded) {
-            onTransactionAdded(addedTransaction);
+            // Update local transactions view
+            updateLocalTransactionsView({
+              ...offlineTransaction,
+              id: offlineTransaction._localId,
+              date:
+                offlineTransaction.date instanceof Date
+                  ? offlineTransaction.date.toISOString()
+                  : offlineTransaction.date,
+            });
           }
-        } catch (error) {
-          console.error("Erro ao adicionar transação:", error);
-          setSyncStatus("error");
-
+        } else {
           // Store offline for later sync
           const offlineTransaction = {
             ...newTransaction,
@@ -466,64 +467,34 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
           );
 
           // Update local transactions view
-          setTransactions([
-            {
-              ...offlineTransaction,
-              id: offlineTransaction._localId,
-              date:
-                offlineTransaction.date instanceof Date
-                  ? offlineTransaction.date.toISOString()
-                  : offlineTransaction.date,
-            },
-            ...transactions,
-          ]);
-        }
-      } else {
-        // Store offline for later sync
-        const offlineTransaction = {
-          ...newTransaction,
-          _operation: "add",
-          _localId: `local_${Date.now()}_${Math.random()
-            .toString(36)
-            .substr(2, 9)}`,
-        };
-
-        const updatedOfflineTransactions = [
-          ...offlineTransactions,
-          offlineTransaction,
-        ];
-        setOfflineTransactions(updatedOfflineTransactions);
-        localStorage.setItem(
-          "offlineTransactions",
-          JSON.stringify(updatedOfflineTransactions)
-        );
-
-        // Update local transactions view
-        setTransactions([
-          {
+          updateLocalTransactionsView({
             ...offlineTransaction,
             id: offlineTransaction._localId,
             date:
               offlineTransaction.date instanceof Date
                 ? offlineTransaction.date.toISOString()
                 : offlineTransaction.date,
-          },
-          ...transactions,
-        ]);
+          });
+        }
       }
-    }
 
-    // Clear form
-    setDescription("");
-    setAmount("");
-    setIsRecurring(false);
-    setInstallments(1);
-    setPaymentMethod("money");
-    setSelectedTags([]);
-    setTransactionDate(() => {
-      const today = new Date();
-      return today.toISOString().split("T")[0]; // Resetar para hoje
-    });
+      // Clear form
+      setDescription("");
+      setAmount("");
+      setIsRecurring(false);
+      setInstallments(1);
+      setPaymentMethod("money");
+      setSelectedTags([]);
+      setTransactionDate(() => {
+        const today = new Date();
+        return today.toISOString().split("T")[0]; // Resetar para hoje
+      });
+    } finally {
+      // Garantir que o estado de submissão é resetado após 2 segundos
+      setTimeout(() => {
+        setIsSubmitting(false);
+      }, 2000);
+    }
   };
 
   // Excluir transação
@@ -560,7 +531,7 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
             setSyncStatus("error");
 
             // Handle offline deletion
-            const groupTransactions = transactions.filter(
+            const groupTransactions = appTransactions.filter(
               (t) => t.groupId === groupId
             );
 
@@ -579,11 +550,13 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
             );
 
             // Update local view
-            setTransactions(transactions.filter((t) => t.groupId !== groupId));
+            if (onTransactionAdded) {
+              onTransactionAdded({});
+            }
           }
         } else {
           // Handle offline or local temporary ID deletion
-          const groupTransactions = transactions.filter(
+          const groupTransactions = appTransactions.filter(
             (t) => t.groupId === groupId
           );
 
@@ -618,7 +591,9 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
           }
 
           // Update local view
-          setTransactions(transactions.filter((t) => t.groupId !== groupId));
+          if (onTransactionAdded) {
+            onTransactionAdded({});
+          }
         }
       }
     } else {
@@ -646,7 +621,9 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
           );
 
           // Update local view
-          setTransactions(transactions.filter((t) => t.id !== id));
+          if (onTransactionAdded) {
+            onTransactionAdded({});
+          }
         }
       } else {
         if (isLocalId) {
@@ -675,7 +652,9 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
         }
 
         // Update local view
-        setTransactions(transactions.filter((t) => t.id !== id));
+        if (onTransactionAdded) {
+          onTransactionAdded({});
+        }
       }
     }
   };
@@ -683,7 +662,7 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
   // Funções de cálculo e formatação
   const calculateBalance = () => {
     try {
-      return transactions
+      return appTransactions
         .reduce((acc, transaction) => {
           const amount = parseFloat(transaction.amount) || 0;
           return acc + amount;
@@ -697,7 +676,7 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
 
   const calculateIncome = () => {
     try {
-      return transactions
+      return appTransactions
         .filter((transaction) => parseFloat(transaction.amount) > 0)
         .reduce((acc, transaction) => {
           const amount = parseFloat(transaction.amount) || 0;
@@ -712,7 +691,7 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
 
   const calculateExpenses = () => {
     try {
-      return transactions
+      return appTransactions
         .filter((transaction) => parseFloat(transaction.amount) < 0)
         .reduce((acc, transaction) => {
           const amount = parseFloat(transaction.amount) || 0;
@@ -749,6 +728,13 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
   // Voltar para a tela de registro
   const handleBackToRegister = () => {
     setActiveScreen("register");
+  };
+
+  // Update local transactions view (mudando push para não modificar o array original)
+  const updateLocalTransactionsView = (newTransaction) => {
+    if (onTransactionAdded) {
+      onTransactionAdded(newTransaction);
+    }
   };
 
   // Renderização do componente
@@ -794,7 +780,7 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
           </div>
 
           <TransactionsList
-            transactions={transactions}
+            transactions={appTransactions}
             onDelete={deleteTransaction}
             categories={getAllCategories()}
             paymentMethods={paymentMethods}
@@ -965,8 +951,12 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
                 />
               </div>
 
-              <button type="submit" className="submit-button">
-                Adicionar Transação
+              <button
+                type="submit"
+                className="submit-button"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Processando..." : "Adicionar Transação"}
               </button>
             </form>
           </section>
@@ -975,7 +965,7 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
           <section className="transactions-list">
             <div className="section-header">
               <h2>Transações Recentes</h2>
-              {transactions.length > 10 && (
+              {appTransactions.length > 10 && (
                 <button
                   onClick={() => setActiveScreen("history")}
                   className="view-all-button"
@@ -987,7 +977,7 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
 
             {loading ? (
               <div className="loading">Carregando transações...</div>
-            ) : transactions.length === 0 ? (
+            ) : appTransactions.length === 0 ? (
               <div className="empty-state">
                 <p>Nenhuma transação registrada ainda.</p>
                 <p>
@@ -1009,7 +999,7 @@ export default function FinanceOrganizer({ userId, onTransactionAdded }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {transactions.slice(0, 10).map((transaction) => {
+                    {appTransactions.slice(0, 10).map((transaction) => {
                       const isOffline = transaction.id
                         .toString()
                         .startsWith("local_");
