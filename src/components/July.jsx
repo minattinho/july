@@ -1,5 +1,5 @@
 // src/components/FinanceOrganizer.jsx
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { db } from "../firebase";
 import {
   collection,
@@ -154,6 +154,10 @@ export default function FinanceOrganizer({
   const [importedTransactions, setImportedTransactions] = useState([]);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importStatus, setImportStatus] = useState(""); // idle, processing, success, error
+
+  // Estado de edição
+  const [isEditing, setIsEditing] = useState(false);
+  const [transactionToEdit, setTransactionToEdit] = useState(null);
 
   // Categorias separadas para despesas e receitas
   const expenseCategories = [
@@ -315,24 +319,183 @@ export default function FinanceOrganizer({
     }
   }, [type]);
 
-  // Adicionar transação
+  // Função para editar uma transação
+  const editTransaction = (transaction) => {
+    // Setar o estado de edição
+    setIsEditing(true);
+    setTransactionToEdit(transaction);
+
+    // Preencher o formulário com os dados da transação
+    setDescription(transaction.description);
+    setAmount(Math.abs(transaction.amount).toString());
+    setType(transaction.amount >= 0 ? "income" : "expense");
+    setCategory(transaction.category || expenseCategories[0].id);
+    setPaymentMethod(transaction.paymentMethod || "money");
+
+    // Configurar data
+    const transactionDate = new Date(transaction.date);
+    setTransactionDate(transactionDate.toISOString().split("T")[0]);
+
+    // Configurar tags
+    setSelectedTags(transaction.tags || []);
+
+    // Rolar para o formulário
+    document
+      .getElementById("add-transaction-form")
+      .scrollIntoView({ behavior: "smooth" });
+  };
+
+  // Função para cancelar edição
+  const cancelEdit = () => {
+    setIsEditing(false);
+    setTransactionToEdit(null);
+
+    // Limpar o formulário
+    setDescription("");
+    setAmount("");
+    setType("expense");
+    setCategory(expenseCategories[0].id);
+    setPaymentMethod("money");
+    setSelectedTags([]);
+    setTransactionDate(() => {
+      const today = new Date();
+      return today.toISOString().split("T")[0];
+    });
+  };
+
+  // Modificar handleSubmit para lidar com edição
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!description || !amount) return;
 
-    // Prevenir envios duplicados
     if (isSubmitting) return;
     setIsSubmitting(true);
 
     try {
-      // Garantir que o valor é um número válido
-      const parsedAmount = parseFloat(amount);
-      if (isNaN(parsedAmount)) {
-        alert("Por favor, insira um valor válido.");
+      const baseAmount = parseFloat(
+        amount.replace(/\./g, "").replace(",", ".")
+      );
+      if (isNaN(baseAmount) || baseAmount <= 0) {
+        alert("Valor inválido. Por favor, insira um valor positivo.");
         return;
       }
 
-      const baseAmount = parsedAmount;
+      // Se estiver no modo de edição, atualizar a transação
+      if (isEditing && transactionToEdit) {
+        const transactionDateTime = new Date(transactionDate);
+
+        // Criar objeto de transação atualizada
+        const updatedTransaction = {
+          ...transactionToEdit,
+          description,
+          amount:
+            type === "expense" ? -Math.abs(baseAmount) : Math.abs(baseAmount),
+          type,
+          category,
+          paymentMethod,
+          date: transactionDateTime.toISOString(),
+          tags: selectedTags.map((tag) => ({
+            id: tag.id,
+            name: tag.name,
+            color: tag.color,
+          })),
+          updatedAt: new Date().toISOString(),
+        };
+
+        const isLocalId = transactionToEdit.id.toString().startsWith("local_");
+
+        if (networkStatus && !isLocalId) {
+          try {
+            setSyncStatus("syncing");
+
+            // Atualizar no Firestore
+            const transactionRef = doc(
+              db,
+              "transactions",
+              transactionToEdit.id
+            );
+            await updateDoc(transactionRef, updatedTransaction);
+
+            setSyncStatus("synced");
+          } catch (error) {
+            console.error("Erro ao atualizar transação:", error);
+            setSyncStatus("error");
+
+            // Armazenar offline para sincronização posterior
+            const offlineTransaction = {
+              ...updatedTransaction,
+              _operation: "update",
+            };
+
+            const updatedOfflineTransactions = [
+              ...offlineTransactions,
+              offlineTransaction,
+            ];
+            setOfflineTransactions(updatedOfflineTransactions);
+            localStorage.setItem(
+              "offlineTransactions",
+              JSON.stringify(updatedOfflineTransactions)
+            );
+
+            // Atualizar a visualização local
+            updateLocalTransactionsView(updatedTransaction);
+          }
+        } else {
+          // Se for uma transação local ou offline
+          if (isLocalId) {
+            // Atualizar na lista de transações offline
+            const updatedOfflineTransactions = offlineTransactions.map((t) =>
+              t._localId === transactionToEdit.id
+                ? { ...t, ...updatedTransaction }
+                : t
+            );
+
+            setOfflineTransactions(updatedOfflineTransactions);
+            localStorage.setItem(
+              "offlineTransactions",
+              JSON.stringify(updatedOfflineTransactions)
+            );
+          } else {
+            // Adicionar à lista de atualizações offline
+            const offlineTransaction = {
+              ...updatedTransaction,
+              _operation: "update",
+            };
+
+            const updatedOfflineTransactions = [
+              ...offlineTransactions,
+              offlineTransaction,
+            ];
+            setOfflineTransactions(updatedOfflineTransactions);
+            localStorage.setItem(
+              "offlineTransactions",
+              JSON.stringify(updatedOfflineTransactions)
+            );
+          }
+
+          // Atualizar a visualização local
+          updateLocalTransactionsView(updatedTransaction);
+        }
+
+        // Limpar o modo de edição
+        setIsEditing(false);
+        setTransactionToEdit(null);
+
+        // Limpar o formulário
+        setDescription("");
+        setAmount("");
+        setType("expense");
+        setCategory(expenseCategories[0].id);
+        setPaymentMethod("money");
+        setSelectedTags([]);
+        setTransactionDate(() => {
+          const today = new Date();
+          return today.toISOString().split("T")[0];
+        });
+
+        return;
+      }
+
+      // Código para adicionar nova transação (código existente)
       const selectedDate = new Date(transactionDate);
       const transactionDateTime = selectedDate.toISOString();
 
@@ -1027,6 +1190,7 @@ export default function FinanceOrganizer({
           <TransactionsList
             transactions={appTransactions}
             onDelete={deleteTransaction}
+            onEdit={editTransaction}
             categories={getAllCategories()}
             paymentMethods={paymentMethods}
           />
@@ -1051,7 +1215,7 @@ export default function FinanceOrganizer({
                     onChange={handleFileImport}
                     disabled={isSubmitting}
                   />
-                  Selecionar arquivo
+                  <span className="upload-icon">⬆️</span> Selecionar arquivo
                 </label>
                 <span className="file-format-info">
                   Formatos aceitos: CSV, OFX
@@ -1221,13 +1385,26 @@ export default function FinanceOrganizer({
                 />
               </div>
 
-              <button
-                type="submit"
-                className="submit-button"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? "Processando..." : "Adicionar Transação"}
-              </button>
+              <div className="form-buttons">
+                <button
+                  type="submit"
+                  className="submit-button"
+                  disabled={isSubmitting}
+                >
+                  {isEditing ? "Atualizar" : "Adicionar"}
+                </button>
+
+                {isEditing && (
+                  <button
+                    type="button"
+                    className="cancel-button"
+                    onClick={cancelEdit}
+                    disabled={isSubmitting}
+                  >
+                    Cancelar
+                  </button>
+                )}
+              </div>
             </form>
           </section>
 
@@ -1255,79 +1432,14 @@ export default function FinanceOrganizer({
                 </p>
               </div>
             ) : (
-              <div className="table-container">
-                <table className="transactions-table">
-                  <thead>
-                    <tr>
-                      <th>Data</th>
-                      <th>Descrição</th>
-                      <th>Categoria</th>
-                      <th>Método</th>
-                      <th>Tags</th>
-                      <th>Valor</th>
-                      <th>Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {appTransactions.slice(0, 10).map((transaction) => {
-                      const isOffline = transaction.id
-                        .toString()
-                        .startsWith("local_");
-
-                      return (
-                        <tr
-                          key={transaction.id}
-                          className={isOffline ? "offline-transaction" : ""}
-                        >
-                          <td>{formatDate(transaction.date)}</td>
-                          <td>{transaction.description}</td>
-                          <td>{getCategoryName(transaction.category)}</td>
-                          <td>
-                            {transaction.paymentMethod
-                              ? getPaymentMethodName(transaction.paymentMethod)
-                              : "Não especificado"}
-                          </td>
-                          <td className="transaction-tags">
-                            {transaction.tags &&
-                              transaction.tags.map((tag) => (
-                                <span
-                                  key={tag.id}
-                                  className="tag-pill"
-                                  style={{ backgroundColor: tag.color }}
-                                >
-                                  {tag.name}
-                                </span>
-                              ))}
-                          </td>
-                          <td
-                            className={
-                              transaction.amount >= 0 ? "positive" : "negative"
-                            }
-                          >
-                            {new Intl.NumberFormat("pt-BR", {
-                              style: "currency",
-                              currency: "BRL",
-                            }).format(transaction.amount)}
-                          </td>
-                          <td>
-                            <button
-                              className="delete-button"
-                              onClick={() =>
-                                deleteTransaction(
-                                  transaction.id,
-                                  transaction.groupId
-                                )
-                              }
-                              title="Excluir transação"
-                            >
-                              ×
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <div className="transaction-list">
+                <TransactionsList
+                  transactions={appTransactions}
+                  onDelete={deleteTransaction}
+                  onEdit={editTransaction}
+                  categories={getAllCategories()}
+                  paymentMethods={paymentMethods}
+                />
               </div>
             )}
           </section>
