@@ -9,6 +9,8 @@ import Reports from "./components/Reports";
 import Login from "./components/Login";
 import LoadingScreen from "./components/LoadingScreen";
 import ThemeToggle from "./components/ThemeToggle";
+import BudgetManager from "./components/BudgetManager";
+import BudgetAlerts from "./components/BudgetAlerts";
 import "./App.css";
 import Notifications from "./components/Notifications";
 
@@ -20,6 +22,8 @@ function App() {
   const [transactions, setTransactions] = useState([]);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
   const [transactionError, setTransactionError] = useState(null);
+  const [budgets, setBudgets] = useState([]);
+  const [loadingBudgets, setLoadingBudgets] = useState(false);
 
   // Autenticação do usuário
   useEffect(() => {
@@ -132,6 +136,55 @@ function App() {
     }
   }, [user]);
 
+  // Carregar orçamentos quando o usuário estiver autenticado
+  useEffect(() => {
+    const fetchBudgets = async () => {
+      if (!user) return;
+
+      try {
+        setLoadingBudgets(true);
+        console.log("App: Buscando orçamentos para o usuário:", user.uid);
+
+        // Use o método onSnapshot para obter atualizações em tempo real
+        const q = query(
+          collection(db, "budgets"),
+          where("userId", "==", user.uid)
+        );
+        const unsubscribe = onSnapshot(
+          q,
+          (snapshot) => {
+            const fetchedBudgets = snapshot.docs.map((doc) => ({
+              id: doc.id,
+              ...doc.data(),
+            }));
+
+            console.log("App: Orçamentos carregados:", fetchedBudgets.length);
+
+            setBudgets(fetchedBudgets);
+            setLoadingBudgets(false);
+          },
+          (error) => {
+            console.error("App: Erro ao buscar orçamentos:", error);
+            setLoadingBudgets(false);
+          }
+        );
+
+        // Limpeza ao desmontar
+        return () => {
+          console.log("App: Removendo listener de orçamentos");
+          unsubscribe();
+        };
+      } catch (error) {
+        console.error("App: Erro ao configurar listener de orçamentos:", error);
+        setLoadingBudgets(false);
+      }
+    };
+
+    if (user) {
+      fetchBudgets();
+    }
+  }, [user]);
+
   const handleLogout = async () => {
     try {
       console.log("App: Iniciando processo de logout");
@@ -204,6 +257,12 @@ function App() {
           >
             Metas
           </button>
+          <button
+            className={activeTab === "budgets" ? "active" : ""}
+            onClick={() => setActiveTab("budgets")}
+          >
+            Orçamentos
+          </button>
         </div>
       </div>
 
@@ -221,6 +280,11 @@ function App() {
             </div>
           ) : (
             <>
+              {/* Exibir alertas de orçamento na parte superior quando no dashboard */}
+              {activeTab === "dashboard" && budgets.length > 0 && (
+                <BudgetAlerts budgets={budgets} transactions={transactions} />
+              )}
+
               {activeTab === "dashboard" && (
                 <Dashboard transactions={transactions} />
               )}
@@ -241,6 +305,10 @@ function App() {
               )}
 
               {activeTab === "goals" && <Goals userId={user.uid} />}
+
+              {activeTab === "budgets" && (
+                <BudgetManager userId={user.uid} transactions={transactions} />
+              )}
             </>
           )}
         </div>
