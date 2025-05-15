@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { auth } from '../firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
 import './Login.css';
 
 export default function Login() {
@@ -9,31 +9,84 @@ export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [authState, setAuthState] = useState('verificando');
 
+  // Verificar estado de autenticação ao carregar o componente
+  useEffect(() => {
+    console.log('Login componente montado, verificando autenticação...');
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        console.log('Usuário já autenticado:', user.uid);
+        setAuthState('autenticado');
+      } else {
+        console.log('Nenhum usuário autenticado');
+        setAuthState('não-autenticado');
+      }
+    }, (error) => {
+      console.error('Erro ao verificar estado de autenticação:', error);
+      setAuthState('erro');
+      setError('Erro ao verificar autenticação: ' + error.message);
+    });
+
+    return () => unsubscribe();
+  }, []);
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
+      console.log(`Tentando ${isLogin ? 'login' : 'cadastro'} com email: ${email}`);
+      
       if (isLogin) {
-        await signInWithEmailAndPassword(auth, email, password);
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        console.log('Login realizado com sucesso:', userCredential.user.uid);
       } else {
-        await createUserWithEmailAndPassword(auth, email, password);
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        console.log('Usuário criado com sucesso:', userCredential.user.uid);
       }
     } catch (error) {
       console.error('Erro de autenticação:', error);
-      setError(
-        error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password'
-          ? 'Email ou senha inválidos'
-          : error.code === 'auth/email-already-in-use'
-          ? 'Este email já está em uso'
-          : 'Ocorreu um erro. Tente novamente.'
-      );
+      console.error('Código do erro:', error.code);
+      console.error('Mensagem do erro:', error.message);
+      
+      // Tratamento de erro mais detalhado
+      switch(error.code) {
+        case 'auth/user-not-found':
+          setError('Usuário não encontrado. Verifique seu email.');
+          break;
+        case 'auth/wrong-password':
+          setError('Senha incorreta. Tente novamente.');
+          break;
+        case 'auth/email-already-in-use':
+          setError('Este email já está em uso.');
+          break;
+        case 'auth/invalid-credential':
+          setError('Credenciais inválidas. Verifique seu email e senha.');
+          break;
+        case 'auth/network-request-failed':
+          setError('Falha na conexão de rede. Verifique sua internet.');
+          break;
+        default:
+          setError(`Erro: ${error.message}`);
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  // Se ainda estiver verificando a autenticação
+  if (authState === 'verificando') {
+    return (
+      <div className="login-page">
+        <div className="login-container">
+          <div className="loading-spinner"></div>
+          <p>Verificando autenticação...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="login-page">

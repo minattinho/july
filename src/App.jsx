@@ -7,24 +7,41 @@ import Dashboard from './components/Dashboard';
 import Goals from './components/Goals';
 import Reports from './components/Reports';
 import Login from './components/Login';
+import LoadingScreen from './components/LoadingScreen';
 import './App.css';
 import Notifications from './components/Notifications';
 
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [transactions, setTransactions] = useState([]);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
+  const [transactionError, setTransactionError] = useState(null);
 
   // Autenticação do usuário
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setLoading(false);
-    });
+    console.log('App: Inicializando verificação de autenticação');
+    
+    const unsubscribe = onAuthStateChanged(auth, 
+      (currentUser) => {
+        console.log('App: Estado de autenticação alterado:', currentUser ? `Usuário: ${currentUser.uid}` : 'Nenhum usuário');
+        setUser(currentUser);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('App: Erro na verificação de autenticação:', error);
+        setAuthError(`Erro de autenticação: ${error.message}`);
+        setLoading(false);
+      }
+    );
 
-    return () => unsubscribe();
+    // Função de limpeza
+    return () => {
+      console.log('App: Removendo listener de autenticação');
+      unsubscribe();
+    };
   }, []);
 
   // Carregar transações quando o usuário estiver autenticado
@@ -34,7 +51,8 @@ function App() {
       
       try {
         setLoadingTransactions(true);
-        console.log("Buscando transações para o usuário:", user.uid);
+        setTransactionError(null);
+        console.log("App: Buscando transações para o usuário:", user.uid);
         
         // Use o método onSnapshot para obter atualizações em tempo real
         const q = query(collection(db, 'transactions'), where('userId', '==', user.uid));
@@ -46,7 +64,7 @@ function App() {
               ...doc.data()
             }));
             
-            console.log("Transações carregadas:", fetchedTransactions.length);
+            console.log("App: Transações carregadas:", fetchedTransactions.length);
             
             // Ordenar por data (mais recentes primeiro)
             fetchedTransactions.sort((a, b) => 
@@ -57,15 +75,20 @@ function App() {
             setLoadingTransactions(false);
           },
           (error) => {
-            console.error('Erro ao buscar transações:', error);
+            console.error('App: Erro ao buscar transações:', error);
+            setTransactionError(`Erro ao carregar transações: ${error.message}`);
             setLoadingTransactions(false);
           }
         );
         
         // Limpeza ao desmontar
-        return () => unsubscribe();
+        return () => {
+          console.log('App: Removendo listener de transações');
+          unsubscribe();
+        };
       } catch (error) {
-        console.error('Erro ao configurar listener:', error);
+        console.error('App: Erro ao configurar listener:', error);
+        setTransactionError(`Erro ao configurar listener: ${error.message}`);
         setLoadingTransactions(false);
       }
     };
@@ -77,20 +100,23 @@ function App() {
 
   const handleLogout = async () => {
     try {
+      console.log('App: Iniciando processo de logout');
       await signOut(auth);
+      console.log('App: Logout realizado com sucesso');
     } catch (error) {
-      console.error('Erro ao fazer logout:', error);
+      console.error('App: Erro ao fazer logout:', error);
+      alert(`Erro ao fazer logout: ${error.message}`);
     }
   };
 
   // Renderiza o componente de loading
   if (loading) {
-    return (
-      <div className="loading-container">
-        <div className="loading-spinner"></div>
-        <p>Carregando...</p>
-      </div>
-    );
+    return <LoadingScreen message="Verificando autenticação..." />;
+  }
+  
+  // Se houver erro de autenticação
+  if (authError) {
+    return <LoadingScreen error={authError} />;
   }
 
   // Renderiza o componente de login se o usuário não estiver autenticado
@@ -149,9 +175,12 @@ function App() {
       <main className="app-content">
         <div className="container">
           {loadingTransactions ? (
-            <div className="loading-transactions">
-              <div className="loading-spinner"></div>
-              <p>Carregando dados...</p>
+            <LoadingScreen message="Carregando transações..." />
+          ) : transactionError ? (
+            <div className="error-message">
+              <h3>Erro ao carregar dados</h3>
+              <p>{transactionError}</p>
+              <button onClick={() => window.location.reload()}>Tentar novamente</button>
             </div>
           ) : (
             <>
