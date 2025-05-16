@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { auth, db } from "./firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
@@ -11,6 +11,11 @@ import LoadingScreen from "./components/LoadingScreen";
 import ThemeToggle from "./components/ThemeToggle";
 import BudgetManager from "./components/BudgetManager";
 import BudgetAlerts from "./components/BudgetAlerts";
+import {
+  setupScrollSnapping,
+  setupSwipeNavigation,
+  enhanceTouchExperience,
+} from "./mobile-touch-handler";
 import "./App.css";
 import Notifications from "./components/Notifications";
 
@@ -24,6 +29,35 @@ function App() {
   const [transactionError, setTransactionError] = useState(null);
   const [budgets, setBudgets] = useState([]);
   const [loadingBudgets, setLoadingBudgets] = useState(false);
+  const tabsContainerRef = useRef(null);
+
+  // Configurar suporte para gestos em dispositivos móveis
+  useEffect(() => {
+    // Ativar otimizações para dispositivos móveis
+    enhanceTouchExperience();
+
+    // Configurar navegação com gestos de deslizar
+    const handleTabSwipe = (direction) => {
+      const tabs = ["dashboard", "register", "reports", "goals", "budgets"];
+      const currentIndex = tabs.indexOf(activeTab);
+      let newIndex;
+
+      if (direction === "next") {
+        newIndex = Math.min(currentIndex + 1, tabs.length - 1);
+      } else {
+        newIndex = Math.max(currentIndex - 1, 0);
+      }
+
+      setActiveTab(tabs[newIndex]);
+    };
+
+    setupSwipeNavigation(".app-content", handleTabSwipe);
+
+    // Configurar scroll suave para abas
+    if (tabsContainerRef.current) {
+      setupScrollSnapping(".mobile-tabs-container");
+    }
+  }, [activeTab]);
 
   // Autenticação do usuário
   useEffect(() => {
@@ -232,7 +266,7 @@ function App() {
       </header>
 
       <div className="app-tabs">
-        <div className="container">
+        <div className="container mobile-tabs-container" ref={tabsContainerRef}>
           <button
             className={activeTab === "dashboard" ? "active" : ""}
             onClick={() => setActiveTab("dashboard")}

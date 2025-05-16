@@ -785,6 +785,43 @@ input:checked + .switch-slider:before {
   .form-group {
     min-width: 100%;
   }
+
+  /* Ajustes ao layout principal para melhor experiência em mobile */
+  .finance-app {
+    padding: 0;
+  }
+
+  .finance-organizer {
+    padding: 0.75rem;
+  }
+
+  .transaction-form,
+  .financial-summary,
+  .transactions-list {
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  /* Melhor visualização em dispositivos móveis */
+  .transaction-history-screen {
+    overflow-x: hidden;
+  }
+
+  /* Ajustes de botões para telas touch */
+  .back-button,
+  .type-button {
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Gráficos responsivos */
+  .chart-container {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 .transaction-form h2,

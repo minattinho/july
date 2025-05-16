@@ -205,8 +205,8 @@ function TransactionsList({
               <tr>
                 <th>Data</th>
                 <th>Descrição</th>
-                <th>Categoria</th>
-                <th>Método de Pagamento</th>
+                <th className="hide-on-mobile">Categoria</th>
+                <th className="hide-on-mobile">Método de Pagamento</th>
                 <th>Valor</th>
                 <th>Ações</th>
               </tr>

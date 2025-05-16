@@ -1,0 +1,502 @@
+/* mobile-responsive.css - Estilos para melhorar a responsividade em dispositivos móveis */
+
+/* Breakpoints para dispositivos móveis */
+:root {
+  --breakpoint-xs: 480px; /* Smartphones pequenos */
+  --breakpoint-sm: 576px; /* Smartphones */
+  --breakpoint-md: 768px; /* Tablets e smartphones na horizontal */
+  --breakpoint-lg: 992px; /* Tablets maiores */
+  --breakpoint-xl: 1200px; /* Desktops */
+}
+
+/* Regras base para aplicação responsiva */
+html {
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+}
+
+/* Melhorias gerais da interface para dispositivos móveis */
+@media (max-width: 768px) {
+  /* Base layout adaptativo */
+  .container {
+    padding: 0 0.75rem;
+  }
+
+  /* Espaçamento adaptativo */
+  .dashboard,
+  .transactions-list-container,
+  .form-container {
+    padding: 0.75rem !important;
+  }
+
+  /* Ajuste de fonte para leitura em telas menores */
+  body {
+    font-size: 14px;
+  }
+
+  h1 {
+    font-size: 1.5rem !important;
+  }
+
+  h2 {
+    font-size: 1.25rem !important;
+  }
+
+  h3 {
+    font-size: 1.1rem !important;
+  }
+
+  /* Botões mais amigáveis para touch */
+  button,
+  .button,
+  .action-button,
+  .submit-button,
+  .login-button,
+  .filter-toggle,
+  .month-nav-btn {
+    min-height: 42px; /* Tamanho mínimo para touch */
+    padding: 0.6rem 1rem !important;
+  }
+
+  /* Formulários mais adaptados */
+  input,
+  select,
+  textarea {
+    font-size: 16px !important; /* Evita zoom automático em iOS */
+    padding: 0.6rem !important;
+  }
+
+  /* Tabelas responsivas */
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Melhorias em formulários */
+  .form-group {
+    margin-bottom: 16px;
+  }
+
+  .form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+
+  /* Evitar que labels e campos fiquem muito juntos */
+  .form-control,
+  .modern-input,
+  input[type="text"],
+  input[type="number"],
+  input[type="date"],
+  input[type="email"],
+  input[type="password"],
+  select,
+  textarea {
+    width: 100%;
+    min-height: 42px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+  }
+
+  /* Estilizar placeholders para leitura melhor */
+  ::placeholder {
+    opacity: 0.7;
+  }
+
+  /* Otimização de performance para animações em mobile */
+  * {
+    will-change: auto;
+  }
+
+  /* Maior área de toque para elementos interativos */
+  a,
+  button,
+  .clickable,
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Navegação com tabs móveis melhorada */
+  .mobile-tabs-container {
+    display: flex;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+    gap: 4px;
+    padding: 0.5rem 0;
+    width: 100%;
+  }
+
+  .mobile-tabs-container::-webkit-scrollbar {
+    display: none; /* Esconde a scrollbar no Chrome/Safari */
+  }
+
+  .mobile-tabs-container {
+    -ms-overflow-style: none; /* IE e Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+
+  .mobile-tabs-container button {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    white-space: nowrap;
+    font-size: 0.9rem;
+    border-radius: 20px; /* Botões arredondados para aparência mais mobile-friendly */
+    padding: 0.5rem 1rem !important;
+    margin: 0 2px;
+    border: none;
+    text-align: center;
+  }
+}
+
+/* Melhorias específicas para smartphones (telas muito pequenas) */
+@media (max-width: 480px) {
+  /* Ajustes ainda mais específicos para telas pequenas */
+  .card {
+    padding: 0.75rem !important;
+  }
+
+  /* Elementos de grid mais responsivos */
+  .summary-cards,
+  .charts,
+  .filters-grid,
+  .form-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Esconder elementos não-essenciais em telas muito pequenas */
+  .tag-pill:nth-child(n + 3) {
+    display: none;
+  }
+
+  /* Ajuste em conteúdo de tabelas */
+  .transactions-table th,
+  .transactions-table td {
+    padding: 0.4rem !important;
+    font-size: 0.75rem !important;
+  }
+
+  /* Esconder colunas menos importantes em telas pequenas */
+  .transactions-table .hide-on-mobile {
+    display: none;
+  }
+
+  /* Botões de ação em telas pequenas */
+  .action-button {
+    width: 32px;
+    height: 32px;
+    padding: 0 !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .action-button span {
+    display: none; /* Ocultar texto, mostrar apenas ícones */
+  }
+
+  /* Ajustes em formulários para telas muito pequenas */
+  .form-group {
+    margin-bottom: 12px;
+  }
+
+  /* Diminuir padding em campos */
+  .form-control,
+  input,
+  select,
+  textarea {
+    padding: 0.5rem !important;
+  }
+
+  /* Agrupar botões de enviar/cancelar */
+  .form-buttons {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  /* Melhorar legibilidade em telas pequenas */
+  body {
+    line-height: 1.4;
+  }
+
+  /* Ajuste de espaçamento entre elementos */
+  .card + .card,
+  .section + .section {
+    margin-top: 0.75rem;
+  }
+
+  /* Controles de formulário maiores para facilitar interação */
+  input[type="checkbox"],
+  input[type="radio"] {
+    transform: scale(1.2);
+  }
+
+  /* Ajustar tamanho e estilo dos botões de navegação para telas muito pequenas */
+  .mobile-tabs-container button {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.8rem !important;
+  }
+}
+
+/* Fix para modais em telas pequenas */
+@media (max-width: 576px) {
+  .import-modal,
+  .modal {
+    width: 95% !important;
+    padding: 0.5rem;
+  }
+
+  .import-modal-content,
+  .modal-content {
+    padding: 0.75rem !important;
+  }
+
+  .import-modal-actions,
+  .modal-actions {
+    padding: 0.75rem !important;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .import-modal-actions button,
+  .modal-actions button {
+    width: 100%;
+  }
+
+  /* Melhorar funcionamento em telas pequenas */
+  .modal {
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+  }
+}
+
+/* Ajustes em gráficos para responsividade */
+@media (max-width: 768px) {
+  .recharts-responsive-container {
+    height: 250px !important;
+  }
+
+  .recharts-wrapper {
+    font-size: 10px !important;
+  }
+
+  .recharts-cartesian-axis-tick-value {
+    font-size: 0.7rem !important;
+  }
+
+  /* Ajuste específico para gráficos em telas menores */
+  .recharts-legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    font-size: 0.7rem !important;
+  }
+
+  /* Limitar número de ticks em eixos em telas pequenas */
+  .recharts-xAxis .recharts-cartesian-axis-tick:nth-child(odd) {
+    display: none;
+  }
+}
+
+/* Touch-friendly dashboard e transações */
+@media (max-width: 768px) {
+  /* Aumentar área clicável */
+  .transaction-item,
+  .tag-pill,
+  .radio-option,
+  tbody tr {
+    min-height: 44px;
+  }
+}
+
+/* Suavizar transições para melhorar a experiência em dispositivos móveis */
+@media (max-width: 768px) {
+  * {
+    transition: all 0.2s ease;
+  }
+}
+
+/* Corrigir problema de overflow em containers */
+@media (max-width: 768px) {
+  .app-tabs .container {
+    justify-content: flex-start;
+    gap: 0;
+  }
+
+  .app-tabs button {
+    flex: 0 0 auto;
+  }
+
+  /* Ajuste específico para o cabeçalho em mobile */
+  .app-header .container {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .user-info {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+}
+
+/* Regras específicas para orientação paisagem em dispositivos móveis */
+@media (max-width: 900px) and (orientation: landscape) {
+  /* Ajuste de layout para modo paisagem */
+  .register-screen {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .financial-summary {
+    grid-column: 1 / -1; /* Ocupar toda a largura */
+  }
+
+  .summary-cards {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
+  }
+
+  /* Reduzir altura de elementos para caber melhor em telas com menor altura */
+  .card,
+  .transactions-list-container,
+  .form-container {
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+
+  /* Mostrar colunas no modo paisagem que são escondidas no retrato */
+  @media (min-width: 480px) {
+    .hide-on-mobile {
+      display: table-cell !important;
+    }
+  }
+
+  /* Posicionamento mais eficiente para formulários */
+  .form-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+
+  /* Botões menores para caber melhor em telas com altura limitada */
+  button,
+  .button,
+  .action-button,
+  .submit-button,
+  .login-button {
+    padding: 0.5rem 0.75rem !important;
+    min-height: 36px;
+  }
+}
+
+/* Evitar que textos quebrem em telas pequenas */
+@media (max-width: 768px) {
+  .summary-card h3,
+  .transaction-item .description,
+  .transaction-amount,
+  th {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+  }
+}
+
+/* Melhorias específicas em dispositivos Apple/iOS */
+@supports (-webkit-touch-callout: none) {
+  /* iOS specific tweaks */
+  input,
+  select,
+  textarea {
+    border-radius: 8px !important;
+  }
+
+  /* Fix para o notch do iPhone X e mais recentes */
+  @media (max-width: 480px) {
+    .app-header {
+      padding-top: env(safe-area-inset-top);
+    }
+
+    .app-footer {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+  }
+
+  /* Evitar duplo toque para selecionar em iOS */
+  .app-tabs button,
+  .action-button,
+  .tab-button {
+    touch-action: manipulation;
+  }
+}
+
+/* Otimizações para Fast-loading em conexões lentas */
+@media (prefers-reduced-data: reduce) {
+  img,
+  video {
+    max-resolution: 0.5dppx;
+  }
+
+  .background-image {
+    background-image: none !important;
+  }
+}
+
+/* Suporte para dispositivos com telas muito estreitas (Galaxy Fold, etc) */
+@media (max-width: 320px) {
+  html {
+    font-size: 13px;
+  }
+
+  .app-tabs {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .app-tabs button {
+    font-size: 0.8rem !important;
+    padding: 0.4rem 0.6rem !important;
+  }
+
+  h2 {
+    font-size: 1.1rem !important;
+  }
+
+  .summary-cards {
+    gap: 0.5rem !important;
+  }
+}
+
+/* Melhorias para gestos de swipe em dispositivos móveis */
+@media (max-width: 768px) {
+  .swipe-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .swipe-item {
+    flex: 0 0 85%;
+    scroll-snap-align: start;
+  }
+}
+
+/* Indicador de foco visual para acessibilidade */
+@media (max-width: 768px) {
+  :focus-visible {
+    outline: 3px solid #1a73e8;
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}

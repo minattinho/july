@@ -248,3 +248,84 @@
     display: none;
   }
 }
+
+/* Melhorias específicas para mobile no Dashboard */
+@media (max-width: 480px) {
+  /* Mobile adjustments for dashboard */
+  .dashboard {
+    padding: 0.75rem !important;
+  }
+
+  /* Simplificar o seletor de mês em dispositivos móveis */
+  .month-selector {
+    flex-direction: column;
+    align-items: center;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .month-select {
+    max-width: 100%;
+    margin-bottom: 0.5rem;
+  }
+
+  /* Melhorar espaçamento entre cards */
+  .summary-cards {
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .card {
+    padding: 0.75rem !important;
+    min-height: 100px; /* Altura mínima para garantir tamanho adequado em telas pequenas */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  /* Melhor visualização de gráficos em dispositivos móveis */
+  .charts {
+    gap: 15px;
+  }
+
+  .chart-container {
+    padding: 0.75rem;
+  }
+
+  /* Adaptar tooltips para telas pequenas */
+  .recharts-tooltip-wrapper {
+    max-width: 90vw;
+    overflow-x: hidden;
+  }
+
+  /* Evitar que valores longos em gráficos quebrem o layout */
+  .recharts-cartesian-axis-tick {
+    font-size: 10px;
+  }
+
+  .recharts-cartesian-axis-tick-value {
+    max-width: 50px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* Melhorias específicas para o modo paisagem em dispositivos móveis */
+@media (max-width: 900px) and (orientation: landscape) {
+  .dashboard {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    align-items: start;
+  }
+
+  .month-selector,
+  .summary-cards {
+    grid-column: 1 / -1;
+  }
+
+  .chart-container {
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+}

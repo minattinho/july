@@ -38,32 +38,31 @@ function Transaction({
     <tr className={isOffline ? "offline-transaction" : ""}>
       <td>{formatDate(transaction.date)}</td>
       <td>{transaction.description}</td>
-      <td>{getCategoryName(transaction.category)}</td>
-      <td>
+      <td className="hide-on-mobile">
+        {getCategoryName(transaction.category)}
+      </td>
+      <td className="hide-on-mobile">
         {transaction.paymentMethod
           ? getPaymentMethodName(transaction.paymentMethod)
           : "Não especificado"}
-      </td>
-      <td>
-        <TransactionTags tags={transaction.tags} />
       </td>
       <td className={transaction.amount >= 0 ? "positive" : "negative"}>
         {formatCurrency(transaction.amount)}
       </td>
       <td className="transaction-actions">
         <button
-          className="edit-button"
+          className="action-button edit-button"
           onClick={() => onEdit(transaction)}
           title="Editar transação"
         >
-          ✎
+          <span>Editar</span> ✎
         </button>
         <button
-          className="delete-button"
+          className="action-button delete-button"
           onClick={() => onDelete(transaction.id, transaction.groupId)}
           title="Excluir transação"
         >
-          ×
+          <span>Excluir</span> ×
         </button>
       </td>
     </tr>
